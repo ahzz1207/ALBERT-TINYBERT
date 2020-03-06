@@ -1,0 +1,2 @@
+model_checkpoint_path: "/work/ALBERT-TF2.0-master/model_configs/temp_v1/ckpt"
+all_model_checkpoint_paths: "/work/ALBERT-TF2.0-master/model_configs/temp_v1/ckpt"
