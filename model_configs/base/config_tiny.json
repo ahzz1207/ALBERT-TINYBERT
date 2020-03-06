@@ -17,5 +17,5 @@
     "down_scale_factor": 1,
     "type_vocab_size": 2,
     "vocab_size": 21128,
-    "shared_type": "all",
+    "shared_type": "all"
 }

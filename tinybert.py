@@ -788,7 +788,7 @@ class Transformer(tf.keras.layers.Layer):
                 initializer_range=0.02,
                 backward_compatible=False,
                 float_type=tf.float32,
-                shared_type = "all"
+                shared_type = "all",
                 **kwargs):
         super(Transformer, self).__init__(**kwargs)
         self.num_hidden_layers = num_hidden_layers

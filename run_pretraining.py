@@ -35,7 +35,7 @@ from tinybert import TinybertConfig, TinybertModel
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
 # os.environ["CUDA_VISIBLE_DEVICES"] = "6"
-FLAGS = flags.FLAGS
+FLAGS = flags.FLAGS 
 
 ## Required parameters
 flags.DEFINE_string(
@@ -105,7 +105,7 @@ flags.DEFINE_float("weight_decay", 0.01, "weight_decay")
 flags.DEFINE_float("adam_epsilon", 1e-6, "adam_epsilon")
 
 flags.DEFINE_enum(
-    "strategy_type", "mirror", ["one", "mirror"],
+    "strategy_type", "one", ["one", "mirror"],
     "Training strategy for single or multi gpu training")
 
 

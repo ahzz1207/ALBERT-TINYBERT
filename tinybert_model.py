@@ -298,9 +298,15 @@ def train_tinybert_model(tinybert_config,
     teacher_sequence_output = albert_teacher.outputs[1]
     student_pooled_output = tinybert_student.outputs[0]
     student_sequence_output = tinybert_student.outputs[1]
-    # print(teacher_pooled_output, student_pooled_output, teacher_sequence_output, student_pooled_output)
+    # dislit loss
     tinybert_loss_layer = TinybertLossLayer(tinybert_config)
     
+    tinybert_pretrain_layer = TinyBertPretrainLayer(tinybert_config,
+                                                    tinybert_student.get_layer(tinybert_encoder),
+                                                    initializer=initializer,
+                                                    name='cls')
+    # pretrain_loss
+    lm_output, sentence_output = tinybert_pretrain_layer(student_pooled_output, student_sequence_output, masked_lm_positions)
     tinybert_pretrain_loss_layer = TinyBertPretrainLossAndMetricLayer(tinybert_config)
     
     loss_output = tinybert_loss_layer(tinybert_config.num_hidden_layers,
@@ -313,7 +319,7 @@ def train_tinybert_model(tinybert_config,
                                       masked_lm_ids,
                                       masked_lm_weights)
     
-    pretrain_loss = tinybert_pretrain_loss_layer(student_pooled_output, student_sequence_output, masked_lm_ids,
+    pretrain_loss = tinybert_pretrain_loss_layer(lm_output, sentence_output, masked_lm_ids,
                                                 masked_lm_weights, next_sentence_labels)
     
     total_loss = loss_output + pretrain_loss
