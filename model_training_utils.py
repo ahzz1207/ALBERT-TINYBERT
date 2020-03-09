@@ -193,11 +193,10 @@ def run_customized_training_loop(
     eval_metrics = [metric_fn()] if metric_fn else []
     # If evaluation is required, make a copy of metric as it will be used by
     # both train and evaluation.
-    train_metrics = [
-        metric.__class__.from_config(metric.get_config())
-        for metric in eval_metrics
-    ]
-
+    # train_metrics = [
+    #     metric.__class__.from_config(metric.get_config())
+    #     for metric in eval_metrics
+    # ]
     # Create summary writers
     summary_dir = os.path.join(model_dir, 'summaries')
     eval_summary_writer = tf.summary.create_file_writer(
@@ -215,18 +214,21 @@ def run_customized_training_loop(
 
       inputs, labels = inputs
       with tf.GradientTape() as tape:
-        print(inputs)
         model_outputs = model(inputs, training=True)
-        print(model_outputs)
         loss = loss_fn(labels, model_outputs)
       # Collects training variables.      
       training_vars = model.trainable_variables
-      grads = tape.gradient(loss, training_vars)
-      optimizer.apply_gradients(zip(grads, training_vars))
+      # 去除albert的变量
+      tv = []
+      for v in training_vars:
+        if not v.name.startswith("albert"):
+          tv.append(v)
+      grads = tape.gradient(loss, tv)
+      optimizer.apply_gradients(zip(grads, tv))
       # For reporting, the metric takes the mean of losses.
       train_loss_metric.update_state(loss)
-      for metric in train_metrics:
-        metric.update_state(labels, model_outputs)
+      # for metric in train_metrics:
+      #   metric.update_state(labels, model_outputs)
 
     @tf.function
     def train_steps(iterator, steps):

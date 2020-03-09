@@ -22,6 +22,7 @@ import functools
 import json
 import os
 import time
+import copy
 
 import tensorflow as tf
 from absl import app, flags, logging
@@ -34,7 +35,7 @@ from albert import AlbertConfig, AlbertModel
 from tinybert import TinybertConfig, TinybertModel
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
-# os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 FLAGS = flags.FLAGS 
 
 ## Required parameters
@@ -177,10 +178,9 @@ def run_customized_training(strategy,
     #     albert_config, max_seq_length, max_predictions_per_seq)
     train_model, albert, tinybert = tinybert_model.train_tinybert_model(
         tinybert_config, albert_config, max_seq_length, max_predictions_per_seq)
-    albert.summary()
-    tinybert.summary()
+    #albert.summary()
+    #tinybert.summary()
     train_model.summary()
-    # print(albert.get_weights())
     # train_model.to_json()
     # albert.to_json()
     # tinybert.to_json()
@@ -286,8 +286,8 @@ def run_bert_pretrain(strategy,input_meta_data):
       input_meta_data["max_seq_length"],
       input_meta_data["max_predictions_per_seq"],
       FLAGS.output_dir,
-      30000,
-      1000,
+      30400,
+      100,
       FLAGS.num_train_epochs,
       FLAGS.learning_rate,
       num_warmup_steps,
