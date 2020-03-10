@@ -216,8 +216,8 @@ def run_customized_training_loop(
       inputs, labels = inputs
       albert_inputs = [inputs['input_word_ids'], inputs['input_mask'], inputs['input_type_ids']]
       with tf.GradientTape() as tape:
-        albert_out = models[0](albert_inputs, training=False)
-        tinybert_out = models[1](albert_inputs, training=True)
+        # albert_out = models[0](albert_inputs, training=False)
+        # tinybert_out = models[1](albert_inputs, training=True)
         model_outputs = models[2](inputs, training=True)
         # loss = loss_fn(labels, model_outputs)
         loss = model_outputs[0]

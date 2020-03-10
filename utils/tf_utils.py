@@ -82,7 +82,7 @@ def swish(features):
   return features * tf.nn.sigmoid(features)
 
 
-def pack_inputs(inputs):
+def pack_inputs(inputs, print_=False):
   """Pack a list of `inputs` tensors to a tuple.
 
   Args:
@@ -97,7 +97,11 @@ def pack_inputs(inputs):
   for x in inputs:
     if x is None:
       outputs.append(tf.constant(0, shape=[], dtype=tf.int32))
+      if print_:
+        print("None")
     else:
+      if print_:
+        print(x.name)
       outputs.append(x)
   return tuple(outputs)
 

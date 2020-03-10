@@ -273,28 +273,29 @@ class TinybertLossLayer(tf.keras.layers.Layer):
             self.initializer = tf.keras.initializers.TruncatedNormal(
                 stddev=self.config.initializer_range)
     
-    def __call__(self,
-                 albert_embedding_table,
-                 tinybert_embedding_table,
-                 albert_pooled_output,
-                 tinybert_pooled_output,
-                 albert_seq_output,
-                 tinybert_seq_output,
-                 albert_atten_score=None,
-                 tinybert_atten_score=None,
-                 albert_logits=None,
-                 tinybert_logits=None,
-                 lm_label_ids=None,
-                 lm_label_weights=None,
-                 **kwargs):
-        inputs = tf_utils.pack_inputs([albert_embedding_table, tinybert_embedding_table, albert_pooled_output, tinybert_pooled_output] + albert_seq_output + tinybert_seq_output + albert_atten_score + tinybert_atten_score + [albert_logits, tinybert_logits,lm_label_ids, lm_label_weights])
-        return super(TinybertLossLayer, self).__call__(inputs, **kwargs)
+    # def __call__(self,
+    #              albert_embedding_table,
+    #              tinybert_embedding_table,
+    #              albert_pooled_output,
+    #              tinybert_pooled_output,
+    #              albert_seq_output,
+    #              tinybert_seq_output,
+    #              albert_atten_score=None,
+    #              tinybert_atten_score=None,
+    #              albert_logits=None,
+    #              tinybert_logits=None,
+    #              lm_label_ids=None,
+    #              lm_label_weights=None,
+    #              **kwargs):
+    #     inputs = [albert_embedding_table, tinybert_embedding_table, albert_pooled_output, tinybert_pooled_output, albert_seq_output, tinybert_seq_output, albert_atten_score, tinybert_atten_score, albert_logits, tinybert_logits,lm_label_ids, lm_label_weights]
+    #     return super(TinybertLossLayer, self).__call__(inputs, **kwargs)
     
     def call(self, inputs):
         """Implements call() for the layer."""
-        unpacked_inputs = tf_utils.unpack_inputs(inputs)
-        # albert_embedding_table = unpacked_inputs[0] # b, l, h
-        # tinybert_embedding_table = unpacked_inputs[1]
+        # unpacked_inputs = tf_utils.unpack_inputs(inputs)
+        unpacked_inputs = tf.nest.flatten(inputs)
+        albert_embedding_table = unpacked_inputs[0] # b, l, h
+        tinybert_embedding_table = unpacked_inputs[1]
         albert_pooled_output = unpacked_inputs[2] # b, h
         tinybert_pooled_output = unpacked_inputs[3]
         albert_sequence_output = unpacked_inputs[4:16] # b, l, h
@@ -303,9 +304,9 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         tinybert_atten_score = unpacked_inputs[34:40] # b*n, l, l
         albert_logits = unpacked_inputs[40] # b, h
         tinybert_logits = unpacked_inputs[41]
-        # embeddings_loss = tf.keras.losses.MSE(y_true=albert_embedding_table, 
-        #                                       y_pred=tinybert_embedding_table)
-        # embeddings_loss = tf.reduce_mean(embeddings_loss)
+        embeddings_loss = tf.keras.losses.MSE(y_true=albert_embedding_table, 
+                                              y_pred=tinybert_embedding_table)
+        embeddings_loss = tf.reduce_mean(embeddings_loss)
         
         attention_loss = 0
         hidden_loss = 0
@@ -322,7 +323,7 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         lm_out_loss = lm_out_loss_fn(albert_logits,
                                     tinybert_logits)
         lm_out_loss = tf.reduce_mean(lm_out_loss)
-        return 0 * self.num_layers + attention_loss + hidden_loss + lm_out_loss * self.num_layers
+        return embeddings_loss * self.num_layers + attention_loss + hidden_loss + lm_out_loss * self.num_layers
     
     
 def train_tinybert_model(tinybert_config,
@@ -400,18 +401,21 @@ def train_tinybert_model(tinybert_config,
     
     tinybert_loss_layer = TinybertLossLayer(tinybert_config, initializer=initializer, name="dislit")
     
-    loss_output = tinybert_loss_layer(albert_embedding_table=albert_layer.embedding_lookup.embeddings,
-                                      tinybert_embedding_table=tinybert_layer.embedding_lookup.embeddings,
-                                      albert_pooled_output=teacher_pooled_output,
-                                      tinybert_pooled_output=student_pooled_output,
-                                      albert_seq_output=teacher_sequence_output,
-                                      tinybert_seq_output=student_sequence_output,
-                                      albert_atten_score=teacher_atten_score,
-                                      tinybert_atten_score=student_atten_score,
-                                      albert_logits=albert_logits,
-                                      tinybert_logits=tinybert_logits,
-                                      lm_label_ids=masked_lm_ids,
-                                      lm_label_weights=masked_lm_weights)
+    # loss_output = tinybert_loss_layer(albert_embedding_table=albert_embed_tensor,
+    #                                   tinybert_embedding_table=tinybert_embed_tensor,
+    #                                   albert_pooled_output=teacher_pooled_output,
+    #                                   tinybert_pooled_output=student_pooled_output,
+    #                                   albert_seq_output=teacher_sequence_output,
+    #                                   tinybert_seq_output=student_sequence_output,
+    #                                   albert_atten_score=teacher_atten_score,
+    #                                   tinybert_atten_score=student_atten_score,
+    #                                   albert_logits=albert_logits,
+    #                                   tinybert_logits=tinybert_logits,
+    #                                   lm_label_ids=masked_lm_ids,
+    #                                   lm_label_weights=masked_lm_weights)
+    loss_output = tinybert_loss_layer([albert_embed_tensor,tinybert_embed_tensor, teacher_pooled_output, student_pooled_output,
+                                       teacher_sequence_output, student_sequence_output, teacher_atten_score, student_atten_score,
+                                       albert_logits, tinybert_logits, masked_lm_ids, masked_lm_weights])
     
     # pretrain_loss
     tinybert_pretrain_loss_metrics_layer = TinyBertPretrainLossAndMetricLayer(tinybert_config, name="metric")
