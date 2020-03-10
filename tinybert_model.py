@@ -86,11 +86,11 @@ class TinyBertPretrainLayer(tf.keras.layers.Layer):
         lm_output = tf.matmul(lm_output, self.embedding_table, transpose_b=True)
         lm_output = tf.nn.bias_add(lm_output, self.output_bias)
         lm_output = tf.nn.log_softmax(lm_output, axis=-1)
-
+        
         logits = tf.matmul(pooled_output, self.next_seq_weights, transpose_b=True)
         logits = tf.nn.bias_add(logits, self.next_seq_bias)
         sentence_output = tf.nn.log_softmax(logits, axis=-1)
-        return (lm_output, sentence_output)
+        return (lm_output, sentence_output, logits)
 
 
 class ALBertPretrainLayer(tf.keras.layers.Layer):
@@ -168,13 +168,12 @@ class ALBertPretrainLayer(tf.keras.layers.Layer):
     lm_output = self.lm_layer_norm(lm_output)
     lm_output = tf.matmul(lm_output, self.embedding_table, transpose_b=True)
     lm_output = tf.nn.bias_add(lm_output, self.output_bias)
-    # lm_output = tf.nn.softmax(lm_output, axis=-1)
     lm_output = tf.nn.log_softmax(lm_output, axis=-1)
 
     logits = tf.matmul(pooled_output, self.next_seq_weights, transpose_b=True)
     logits = tf.nn.bias_add(logits, self.next_seq_bias)
     sentence_output = tf.nn.log_softmax(logits, axis=-1)
-    return (lm_output, sentence_output)
+    return (lm_output, sentence_output, logits)
 
 
 class TinyBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
@@ -248,7 +247,7 @@ class TinyBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
     # TODO(hongkuny): Avoids the hack and switches add_loss.
     final_loss = tf.fill(
         tf.keras.backend.shape(per_example_loss_sentence), loss)
-
+    
     self._add_metrics(lm_output, lm_label_ids, lm_label_weights,
                       lm_per_example_loss, sentence_output, sentence_labels,
                       per_example_loss_sentence)
@@ -285,12 +284,12 @@ class TinybertLossLayer(tf.keras.layers.Layer):
                  tinybert_seq_output=None,
                  albert_atten_score=None,
                  tinybert_atten_score=None,
-                 albert_lm_out=None,
-                 tinybert_lm_out=None,
+                 albert_logits=None,
+                 tinybert_logits=None,
                  lm_label_ids=None,
                  lm_label_weights=None,
                  **kwargs):
-        inputs = tf_utils.pack_inputs([albert_embedding_table, tinybert_embedding_table, albert_pooled_output, tinybert_pooled_output, albert_seq_output, tinybert_seq_output, albert_atten_score, tinybert_atten_score, albert_lm_out, tinybert_lm_out,lm_label_ids, lm_label_weights])
+        inputs = tf_utils.pack_inputs([albert_embedding_table, tinybert_embedding_table, albert_pooled_output, tinybert_pooled_output] + albert_seq_output + tinybert_seq_output + albert_atten_score + tinybert_atten_score + [albert_logits, tinybert_logits,lm_label_ids, lm_label_weights])
         return super(TinybertLossLayer, self).__call__(inputs, **kwargs)
     
     def call(self, inputs):
@@ -300,20 +299,20 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         tinybert_embedding_table = unpacked_inputs[1]
         albert_pooled_output = unpacked_inputs[2]
         tinybert_pooled_output = unpacked_inputs[3]
-        albert_sequence_output = unpacked_inputs[4]
-        tinybert_sequence_output = unpacked_inputs[5]
-        albert_atten_score = unpacked_inputs[6]
-        tinybert_atten_score = unpacked_inputs[7]
-        albert_lm_out = unpacked_inputs[8]
-        tinybert_lm_out = unpacked_inputs[9]
+        albert_sequence_output = unpacked_inputs[4:16]
+        tinybert_sequence_output = unpacked_inputs[16:22]
+        albert_atten_score = unpacked_inputs[22:34]
+        tinybert_atten_score = unpacked_inputs[34:40]
+        albert_logits = unpacked_inputs[40]
+        tinybert_logits = unpacked_inputs[41]
         
         embeddings_loss = tf.keras.losses.MSE(y_true=albert_embedding_table, 
                                               y_pred=tinybert_embedding_table)
         embeddings_loss = tf.reduce_mean(embeddings_loss)
         
         attention_loss = 0
-        hidden_loss = 0 
-        for i in range(5):
+        hidden_loss = 0
+        for i in range(self.num_layers):
             #print(albert_atten_score, tinybert_atten_score, albert_sequence_output, tinybert_sequence_output)
             atten_loss = tf.keras.losses.MSE(y_true=albert_atten_score[i*2],
                                                 y_pred=tinybert_atten_score[i])
@@ -323,10 +322,9 @@ class TinybertLossLayer(tf.keras.layers.Layer):
             hidden_loss += tf.reduce_mean(seq_loss)
         
         lm_out_loss_fn = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
-        lm_out_loss = lm_out_loss_fn(albert_lm_out,
-                                    tinybert_lm_out)
+        lm_out_loss = lm_out_loss_fn(albert_logits,
+                                    tinybert_logits)
         lm_out_loss = tf.reduce_mean(lm_out_loss)
-        print(embeddings_loss ,lm_out_loss)
         return embeddings_loss + attention_loss + hidden_loss + lm_out_loss
     
     
@@ -357,45 +355,45 @@ def train_tinybert_model(tinybert_config,
     ##bert_base teacher
     float_type = tf.float32
     albert_encoder = "albert_model"
-    albert_layer = AlbertModel(config=albert_config, float_type=float_type, name=albert_encoder)
+    albert_layer = AlbertModel(config=albert_config, float_type=float_type, name=albert_encoder, trainable=False)
     albert_pooled_output, albert_sequence_output, albert_attention_scores = albert_layer(input_word_ids, input_mask,input_type_ids)
     ##tinybert student
     float_type = tf.float32
     tinybert_encoder = "tinybert_model"
     tinybert_layer = TinybertModel(config=tinybert_config, float_type=float_type, name=tinybert_encoder)
     tinybert_pooled_output, tinybert_sequence_output, tinybert_attention_scores = tinybert_layer(input_word_ids, input_mask, input_type_ids)
-    print(tinybert_attention_scores, tinybert_sequence_output)
+    
     albert_teacher = tf.keras.Model(
         inputs = [input_word_ids, input_mask, input_type_ids],
-        outputs = [albert_pooled_output, albert_sequence_output, albert_attention_scores]
+        outputs = [albert_pooled_output] + albert_sequence_output + albert_attention_scores
     )
     
     tinybert_student = tf.keras.Model(
         inputs = [input_word_ids, input_mask, input_type_ids],
-        outputs = [tinybert_pooled_output, tinybert_sequence_output, tinybert_attention_scores]
+        outputs = [tinybert_pooled_output] + tinybert_sequence_output + tinybert_attention_scores
     )
     
     teacher_pooled_output = albert_teacher.outputs[0]
-    teacher_sequence_output = albert_teacher.outputs[1]
-    teacher_atten_score = albert_teacher.outputs[2]
+    teacher_sequence_output = albert_teacher.outputs[1:13]
+    teacher_atten_score = albert_teacher.outputs[13:25]
     student_pooled_output = tinybert_student.outputs[0]
-    student_sequence_output = tinybert_student.outputs[1]
-    student_atten_score = tinybert_student.outputs[2]
+    student_sequence_output = tinybert_student.outputs[1:7]
+    student_atten_score = tinybert_student.outputs[7:13]
     # dislit loss
-        
+    
     tinybert_pretrain_layer = TinyBertPretrainLayer(tinybert_config,
                                                     tinybert_student.get_layer(tinybert_encoder),
                                                     initializer=initializer,
                                                     name='tinybert_cls')
-    tinybert_lm_output, tinybert_sentence_output = tinybert_pretrain_layer(student_pooled_output, student_sequence_output, masked_lm_positions)
+    tinybert_lm_output, tinybert_sentence_output, tinybert_logits = tinybert_pretrain_layer(student_pooled_output, student_sequence_output[-1], masked_lm_positions)
    
     albert_pretrain_layer = ALBertPretrainLayer(albert_config,
                                                 albert_teacher.get_layer(albert_encoder),
                                                 initializer=initializer,
-                                                name='albert_cls')
-    albert_lm_output, albert_sentence_output = albert_pretrain_layer(teacher_pooled_output, teacher_sequence_output, masked_lm_positions)
+                                                name='albert_cls',
+                                                trainable=False)
+    albert_lm_output, albert_sentence_output, albert_logits = albert_pretrain_layer(teacher_pooled_output, teacher_sequence_output[-1], masked_lm_positions)
     
-    print(teacher_atten_score, teacher_sequence_output)
     tinybert_loss_layer = TinybertLossLayer(tinybert_config, name="dislit")
     loss_output = tinybert_loss_layer(
                                       albert_layer.embedding_lookup.embeddings,
@@ -406,8 +404,8 @@ def train_tinybert_model(tinybert_config,
                                       student_sequence_output,
                                       teacher_atten_score,
                                       student_atten_score,
-                                      albert_lm_output,
-                                      tinybert_lm_output,
+                                      albert_logits,
+                                      tinybert_logits,
                                       masked_lm_ids,
                                       masked_lm_weights)
     
@@ -429,4 +427,4 @@ def train_tinybert_model(tinybert_config,
             'masked_lm_weights': masked_lm_weights,
             'next_sentence_labels': next_sentence_labels,
         },
-        outputs = total_loss), albert_teacher, tinybert_student
+        outputs = [total_loss, pretrain_loss]), albert_teacher, tinybert_student

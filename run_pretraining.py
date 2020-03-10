@@ -45,7 +45,7 @@ flags.DEFINE_string(
     "This specifies the model architecture.")
 
 flags.DEFINE_bool(
-    "start_with_train_model", False, "model restore from ckpt or every .h5 file")
+    "start_with_train_model", False, "model restore from ckpt of trained_model ,else restore from every .h5 file")
 
 flags.DEFINE_string(
     "tinybert_config_file", "/work/ALBERT-TF2.0-master/model_configs/base/config_tiny.json",
@@ -88,14 +88,14 @@ flags.DEFINE_bool("do_train", True, "Whether to run training.")
 
 flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
 
-flags.DEFINE_integer("train_batch_size", 8, "Total batch size for training.")
+flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
 
 flags.DEFINE_integer("eval_batch_size", 16, "Total batch size for eval.")
 
 flags.DEFINE_enum("optimizer", "adamw", ["adamw", "lamb"],
                   "The optimizer for training.")
 
-flags.DEFINE_float("learning_rate", 5e-4, "The initial learning rate.")
+flags.DEFINE_float("learning_rate", 2e-5, "The initial learning rate.")
 
 flags.DEFINE_integer("num_train_epochs", 1, "Number of training epochs.")
 

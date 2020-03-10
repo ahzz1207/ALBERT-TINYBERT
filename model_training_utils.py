@@ -185,7 +185,7 @@ def run_customized_training_loop(
   # pipeline ops in worker task.
   train_iterator = _get_input_iterator(train_input_fn, strategy)
   optimizer = model.optimizer
-
+  
   with strategy.scope():
 
     train_loss_metric = tf.keras.metrics.Mean(
@@ -215,16 +215,18 @@ def run_customized_training_loop(
       inputs, labels = inputs
       with tf.GradientTape() as tape:
         model_outputs = model(inputs, training=True)
-        loss = loss_fn(labels, model_outputs)
+        # loss = loss_fn(labels, model_outputs)
+        loss = model_outputs[0]
       # Collects training variables.      
       training_vars = model.trainable_variables
       # 去除albert的变量
-      tv = []
-      for v in training_vars:
-        if not v.name.startswith("albert"):
-          tv.append(v)
-      grads = tape.gradient(loss, tv)
-      optimizer.apply_gradients(zip(grads, tv))
+      # tv = []
+      # for v in training_vars:
+      #   if not v.name.startswith("albert"):
+      #     tv.append(v)
+      grads = tape.gradient(loss, training_vars)
+      optimizer.apply_gradients(zip(grads, training_vars))
+      # print(training_vars)
       # For reporting, the metric takes the mean of losses.
       train_loss_metric.update_state(loss)
       # for metric in train_metrics:
@@ -328,7 +330,6 @@ def run_customized_training_loop(
       else:
         tinybert.load_weights(f"{model_dir}/models/tinybert_model.h5")
         logging.info('Loading from h5 file completed')
-      
     current_step = optimizer.iterations.numpy()
     checkpoint_name = 'ctl_step_{step}.ckpt'
 
