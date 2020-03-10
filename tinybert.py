@@ -173,10 +173,10 @@ class TinybertModel(tf.keras.layers.Layer):
             return self.encoder(
                 embedding_tensor, attention_mask, return_all_layers=True)
 
-        sequence_output = self.encoder(embedding_tensor, attention_mask, return_all_layers=True)
+        sequence_output, attention_scores = self.encoder(embedding_tensor, attention_mask, return_all_layers=True)
         first_token_tensor = tf.squeeze(sequence_output[-1][:, 0:1, :], axis=1)
         pooled_output = self.pooler_transform(first_token_tensor)
-        return (pooled_output, sequence_output)
+        return (pooled_output, sequence_output, attention_scores)
     
     def get_config(self):
         config = {"config": self.config.to_dict()}
@@ -432,7 +432,9 @@ class Attention(tf.keras.layers.Layer):
         # Normalize the attention scores to probabilities.
         # `attention_probs` = [B, N, F, T]
         attention_probs = tf.nn.softmax(attention_scores)
-
+        # reshape to [b*n, f, t]
+        shapes = attention_scores.shape
+        attention_scores = tf.reshape(attention_scores, [-1, shapes[2], shapes[3]])
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.attention_probs_dropout(attention_probs,training=kwargs.get('training', False))
@@ -440,7 +442,7 @@ class Attention(tf.keras.layers.Layer):
         # `context_layer` = [B, F, N, H]
         context_tensor = tf.einsum("BNFT,BTNH->BFNH", attention_probs, value_tensor)
 
-        return context_tensor
+        return context_tensor, attention_scores
 
     def _projection_dense_layer(self, name):
         """A helper to define a projection layer."""
@@ -741,7 +743,7 @@ class TransformerBlock(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         """Implements call() for the layer."""
         (input_tensor, attention_mask) = tf_utils.unpack_inputs(inputs)
-        attention_output = self.attention_layer(
+        attention_output, atten_scores = self.attention_layer(
             from_tensor=input_tensor,
             to_tensor=input_tensor,
             attention_mask=attention_mask,**kwargs)
@@ -762,7 +764,7 @@ class TransformerBlock(tf.keras.layers.Layer):
         layer_output = self.output_layer_norm(layer_output + attention_output)
         if self.float_type == tf.float16:
             layer_output = tf.cast(layer_output, tf.float16)
-        return layer_output
+        return layer_output, atten_scores
 
 
 class Transformer(tf.keras.layers.Layer):
@@ -855,14 +857,15 @@ class Transformer(tf.keras.layers.Layer):
         output_tensor = input_tensor
 
         all_layer_outputs = []
+        all_layer_attentions = []
         for i in range(self.num_hidden_layers):
-            output_tensor = self.shared_layers[i](output_tensor, attention_mask, **kwargs)
+            output_tensor, atten_scores = self.shared_layers[i](output_tensor, attention_mask, **kwargs)
             all_layer_outputs.append(output_tensor)
-
+            all_layer_attentions.append(atten_scores)
         if return_all_layers:
-            return all_layer_outputs
+            return all_layer_outputs, all_layer_attentions
 
-        return all_layer_outputs[-1]
+        return all_layer_outputs[-1], all_layer_attentions[-1]
     
 
 def get_initializer(initializer_range=0.02):
