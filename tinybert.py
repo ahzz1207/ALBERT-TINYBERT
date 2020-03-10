@@ -169,14 +169,13 @@ class TinybertModel(tf.keras.layers.Layer):
             attention_mask = create_attention_mask_from_input_mask(
                 input_word_ids, input_mask)
 
-        if mode == "encoder":
-            return self.encoder(
-                embedding_tensor, attention_mask, return_all_layers=True)
-
+        # if mode == "encoder":
+        #     return self.encoder(
+        #         embedding_tensor, attention_mask, return_all_layers=True)
         sequence_output, attention_scores = self.encoder(embedding_tensor, attention_mask, return_all_layers=True)
         first_token_tensor = tf.squeeze(sequence_output[-1][:, 0:1, :], axis=1)
         pooled_output = self.pooler_transform(first_token_tensor)
-        return (pooled_output, sequence_output, attention_scores)
+        return (pooled_output, sequence_output, attention_scores, embedding_tensor)
     
     def get_config(self):
         config = {"config": self.config.to_dict()}
@@ -864,7 +863,6 @@ class Transformer(tf.keras.layers.Layer):
             all_layer_attentions.append(atten_scores)
         if return_all_layers:
             return all_layer_outputs, all_layer_attentions
-
         return all_layer_outputs[-1], all_layer_attentions[-1]
     
 

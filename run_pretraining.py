@@ -178,8 +178,8 @@ def run_customized_training(strategy,
     #     albert_config, max_seq_length, max_predictions_per_seq)
     train_model, albert, tinybert = tinybert_model.train_tinybert_model(
         tinybert_config, albert_config, max_seq_length, max_predictions_per_seq)
-    #albert.summary()
-    #tinybert.summary()
+    albert.summary()
+    tinybert.summary()
     train_model.summary()
     # train_model.to_json()
     # albert.to_json()
@@ -211,6 +211,7 @@ def run_customized_training(strategy,
   # 注意这里的model_dir是albert和tinybert共享，需要修改
   trained_model = run_customized_training_loop(
       strategy=strategy,
+      models=[albert, tinybert, train_model],
       model=train_model,
       albert=albert,
       tinybert=tinybert,

@@ -81,6 +81,7 @@ def run_customized_training_loop(
     _sentinel=None,
     # pylint: enable=invalid-name
     strategy=None,
+    models=None,
     model=None,
     albert=None,
     tinybert=None,
@@ -213,12 +214,15 @@ def run_customized_training_loop(
       """Replicated training step."""
 
       inputs, labels = inputs
+      albert_inputs = [inputs['input_word_ids'], inputs['input_mask'], inputs['input_type_ids']]
       with tf.GradientTape() as tape:
-        model_outputs = model(inputs, training=True)
+        albert_out = models[0](albert_inputs, training=False)
+        tinybert_out = models[1](albert_inputs, training=True)
+        model_outputs = models[2](inputs, training=True)
         # loss = loss_fn(labels, model_outputs)
         loss = model_outputs[0]
       # Collects training variables.      
-      training_vars = model.trainable_variables
+      training_vars = models[0].trainable_variables + models[1].trainable_variables + models[2].trainable_variables
       # 去除albert的变量
       # tv = []
       # for v in training_vars:
