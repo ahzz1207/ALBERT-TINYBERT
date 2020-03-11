@@ -53,7 +53,7 @@ flags.DEFINE_string(
     "This specifies the model architecture.")
 
 flags.DEFINE_string(
-    "input_files", "/work/inputfiles_256/0.tfrecord",
+    "input_files", "/work/inputfiles_256/*.tfrecord",
     "Input TF example files (can be a glob or comma separated).")
   
 flags.DEFINE_string("meta_data_file_path", None,
@@ -287,8 +287,8 @@ def run_bert_pretrain(strategy,input_meta_data):
       input_meta_data["max_seq_length"],
       input_meta_data["max_predictions_per_seq"],
       FLAGS.output_dir,
-      30400,
-      100,
+      300000,
+      1000,
       FLAGS.num_train_epochs,
       FLAGS.learning_rate,
       num_warmup_steps,
