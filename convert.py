@@ -32,13 +32,13 @@ from albert_model import pretrain_model
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("albert_config_file", "/work/ALBERT-TF2.0-master/model_configs/base/config.json",
+flags.DEFINE_string("albert_config_file", "/work/ALBERT-TF2.0-master/model_configs/xxlarge/config.json",
                     "Albert configuration file to define core bert layers.")
 flags.DEFINE_string(
-    "checkpoint_to_convert", "/work/ALBERT-master_google/model.ckpt-best",
+    "checkpoint_to_convert", "/work/ALBERT-master_google/export/",
     "Initial checkpoint from a pretrained BERT model core (that is, only the "
     "BertModel, with no task heads.)")
-flags.DEFINE_string("converted_checkpoint_path", "/work/ALBERT-TF2.0-master/model_configs/base",
+flags.DEFINE_string("converted_checkpoint_path", "/work/ALBERT-TF2.0-master/model_configs/xxlarge",
                     "Name for the created object-based V2 checkpoint.")
 
 

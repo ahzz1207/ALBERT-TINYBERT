@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from albert import AlbertConfig, AlbertModel
 from tinybert import TinybertConfig, TinybertModel
-from utils import tf_utils
+from utils import tf_utils, losses
 
 class TinyBertPretrainLayer(tf.keras.layers.Layer):
     """Wrapper layer for pre-training a ALBERT model.
@@ -201,6 +201,7 @@ class TinyBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
                    lm_per_example_loss, sentence_output, sentence_labels,
                    sentence_per_example_loss):
     """Adds metrics."""
+    print(lm_output, lm_labels)
     masked_lm_accuracy = tf.keras.metrics.sparse_categorical_accuracy(
         lm_labels, lm_output)
     masked_lm_accuracy = tf.reduce_mean(masked_lm_accuracy * lm_label_weights)
@@ -219,8 +220,34 @@ class TinyBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
     sentence_order_mean_loss = tf.reduce_mean(sentence_per_example_loss)
     self.add_metric(
         sentence_order_mean_loss, name='sentence_order_mean_loss', aggregation='mean')
-
+    
   def call(self, inputs):
+    # """Implements call() for the layer."""
+    # unpacked_inputs = tf_utils.unpack_inputs(inputs)
+    # lm_output = unpacked_inputs[0]
+    # sentence_output = unpacked_inputs[1]
+    # lm_label_ids = unpacked_inputs[2]
+    # lm_label_weights = unpacked_inputs[3]
+    # sentence_labels = unpacked_inputs[4]
+    
+    # lm_label_weights = tf.cast(lm_label_weights, tf.float32)
+    # lm_output = tf.cast(lm_output, tf.float32)
+    # sentence_output = tf.cast(sentence_output, tf.float32)
+    # mask_label_loss = losses.loss(
+    #     labels=lm_label_ids, predictions=lm_output, weights=lm_label_weights)
+    
+    # sentence_loss = losses.loss(
+    #     labels=sentence_labels, predictions=sentence_output)
+    
+    # loss = mask_label_loss + sentence_loss
+    # batch_shape = tf.slice(tf.shape(sentence_labels), [0], [1])
+    # # TODO(hongkuny): Avoids the hack and switches add_loss.
+    # final_loss = tf.fill(batch_shape, loss)
+    # print(batch_shape, final_loss)
+    # self._add_metrics(lm_output, lm_label_ids, lm_label_weights,
+    #                   mask_label_loss, sentence_output, sentence_labels,
+    #                   sentence_loss)
+    # return final_loss
     """Implements call() for the layer."""
     unpacked_inputs = tf_utils.unpack_inputs(inputs)
     lm_output = unpacked_inputs[0]
@@ -312,10 +339,15 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         hidden_loss = 0
         for i in range(self.num_layers):
             #print(albert_atten_score, tinybert_atten_score, albert_sequence_output, tinybert_sequence_output)
-            atten_loss = tf.keras.losses.MSE(y_true=albert_atten_score[i*2],
-                                                y_pred=tinybert_atten_score[i])
+            y = albert_atten_score[i*2+1]
+            x = tinybert_atten_score[i]
+            y_true = tf.where(y < -1e2, y, tf.zeros_like(y))
+            y_pred = tf.where(x < -1e2, x, tf.zeros_like(x))
+            atten_loss = tf.keras.losses.MSE(y_true=y_true,
+                                                y_pred=y_pred)
             attention_loss += tf.reduce_mean(atten_loss)
-            seq_loss = tf.keras.losses.MSE(y_true=albert_sequence_output[i*2], 
+            
+            seq_loss = tf.keras.losses.MSE(y_true=albert_sequence_output[i*2+1], 
                                             y_pred=tinybert_sequence_output[i])
             hidden_loss += tf.reduce_mean(seq_loss)
         
@@ -323,7 +355,15 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         lm_out_loss = lm_out_loss_fn(albert_logits,
                                     tinybert_logits)
         lm_out_loss = tf.reduce_mean(lm_out_loss)
-        return embeddings_loss * self.num_layers + attention_loss + hidden_loss + lm_out_loss * self.num_layers
+
+        self.add_metric(
+            hidden_loss, name='hidden_loss',aggregation='mean')
+        self.add_metric(
+            attention_loss, name='attention_loss', aggregation='mean'
+        )
+        self.add_metric(lm_out_loss, name='lm_out_loss', aggregation='mean')
+
+        return attention_loss + hidden_loss 
     
     
 def train_tinybert_model(tinybert_config,

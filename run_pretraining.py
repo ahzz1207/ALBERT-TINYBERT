@@ -60,7 +60,7 @@ flags.DEFINE_string("meta_data_file_path", None,
                     "The path in which input meta data will be written.")
 
 flags.DEFINE_string(
-    "output_dir", "/work/ALBERT-TF2.0-master/model_out",
+    "output_dir", "/work/ALBERT-TF2.0-master/model_out2",
     "The output directory where the model checkpoints will be written.")
 
 ## Other parameters
@@ -88,16 +88,20 @@ flags.DEFINE_bool("do_train", True, "Whether to run training.")
 
 flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
 
-flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
+flags.DEFINE_integer("train_batch_size", 128, "Total batch size for training.")
 
 flags.DEFINE_integer("eval_batch_size", 16, "Total batch size for eval.")
 
 flags.DEFINE_enum("optimizer", "adamw", ["adamw", "lamb"],
                   "The optimizer for training.")
 
-flags.DEFINE_float("learning_rate", 2e-5, "The initial learning rate.")
+flags.DEFINE_float("learning_rate", 4e-5, "The initial learning rate.")
 
-flags.DEFINE_integer("num_train_epochs", 1, "Number of training epochs.")
+flags.DEFINE_integer("steps_per_loop", 1000, "One loop run numbers steps")
+
+flags.DEFINE_integer("steps_per_epoch", 100000, "how many steps to save model")
+
+flags.DEFINE_integer("num_train_epochs", 10, "Number of training epochs.")
 
 flags.DEFINE_float("warmup_proportion", 0.1, "Number of warmup steps.")
 
@@ -209,21 +213,22 @@ def run_customized_training(strategy,
         exclude_from_weight_decay=['layer_norm', 'bias']) 
     train_model.optimizer = optimizer
   # 注意这里的model_dir是albert和tinybert共享，需要修改
-  trained_model = run_customized_training_loop(
-      strategy=strategy,
-      models=[albert, tinybert, train_model],
-      model=train_model,
-      albert=albert,
-      tinybert=tinybert,
-      start_wtih_trained_model=FLAGS.start_with_train_model,
-      loss_fn=get_loss_fn(
-          loss_factor=1.0 /
-          strategy.num_replicas_in_sync),
-      model_dir = model_dir,
-      train_input_fn=train_input_fn,
-      steps_per_epoch=steps_per_epoch,
-      steps_per_loop=steps_per_loop,
-      epochs=epochs)
+  if FLAGS.do_train:
+    trained_model = run_customized_training_loop(
+        strategy=strategy,
+        models=[albert, tinybert, train_model],
+        model=train_model,
+        albert=albert,
+        tinybert=tinybert,
+        start_wtih_trained_model=FLAGS.start_with_train_model,
+        loss_fn=get_loss_fn(
+            loss_factor=1.0 /
+            strategy.num_replicas_in_sync),
+        model_dir = model_dir,
+        train_input_fn=train_input_fn,
+        steps_per_epoch=steps_per_epoch,
+        steps_per_loop=steps_per_loop,
+        epochs=epochs)
   # Creates the BERT core model outside distribution strategy scope.
   training, albert, tinybert = tinybert_model.train_tinybert_model(
                                           tinybert_config, albert_config, 
@@ -287,8 +292,8 @@ def run_bert_pretrain(strategy,input_meta_data):
       input_meta_data["max_seq_length"],
       input_meta_data["max_predictions_per_seq"],
       FLAGS.output_dir,
-      300000,
-      1000,
+      FLAGS.steps_per_epoch,
+      FLAGS.steps_per_loop,
       FLAGS.num_train_epochs,
       FLAGS.learning_rate,
       num_warmup_steps,
@@ -302,7 +307,7 @@ def main(_):
 
   # with tf.io.gfile.GFile(FLAGS.meta_data_file_path, 'rb') as reader:
   #   input_meta_data = json.loads(reader.read().decode('utf-8'))
-  input_meta_data = {"max_seq_length":256, "max_predictions_per_seq":25, 'train_data_size':10000000}
+  input_meta_data = {"max_seq_length":256, "max_predictions_per_seq":25, 'train_data_size':50000000}
   strategy = None
   if FLAGS.strategy_type == 'mirror':
     strategy = tf.distribute.MirroredStrategy()

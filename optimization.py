@@ -139,6 +139,9 @@ class AdamWeightDecay(tf.keras.optimizers.Adam):
 
     def apply_gradients(self, grads_and_vars, name=None):
         grads, tvars = list(zip(*grads_and_vars))
+        # for all reduce to do clip before apply_gradients
+        # allreduced_grads = tf.distribute.get_replica_context().all_reduce(
+        # tf.distribute.ReduceOp.SUM, grads)
         (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
         return super(AdamWeightDecay, self).apply_gradients(zip(grads, tvars))
 

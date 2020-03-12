@@ -11,17 +11,17 @@ from albert import AlbertConfig, AlbertModel
 from albert_model import pretrain_model
 
 FLAGS = flags.FLAGS
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 flags.DEFINE_enum("model_type","albert_encoder",["albert_encoder","albert"],
                   "Select model type for weight conversion.\n"
                   "albert_enoder for finetuning tasks.\n"
                   "albert for MLM & SOP FineTuning on domain specific data.")
 
-flags.DEFINE_string("config", "/work/ALBERT-TF2.0-master/model_configs/base/config.json", "tf hub model version to convert 1 or 2.")
+flags.DEFINE_string("config", "/work/ALBERT-TF2.0-master/model_configs/xxlarge/config.json", "tf hub model version to convert 1 or 2.")
 
-flags.DEFINE_string("model_dir", "/work/ALBERT-TF2.0-master/3", "tf1.x albert model file")
+flags.DEFINE_string("model_dir", "/work/ALBERT-master_google/export", "tf1.x albert model file")
 
-flags.DEFINE_enum("model","base",["base", "large", "xlarge", "xxlarge"],"model for converison")
+flags.DEFINE_enum("model","xxlarge",["base", "large", "xlarge", "xxlarge"],"model for converison")
 
 weight_map = {
     "bert/embeddings/word_embeddings": "albert_model/word_embeddings/embeddings:0",
@@ -83,7 +83,7 @@ def main(_):
 
     stock_values = {}
 
-    input_checkpoint = "/work/ALBERT-master_google/export"
+    input_checkpoint = "/work/ALBERT-master_google/export/"
     # with tf.Graph().as_default():
     #     sm = tf.compat.v2.saved_model.load(FLAGS.model_dir, tags=tags)
     #     with tf.compat.v1.Session() as sess:
@@ -116,11 +116,11 @@ def main(_):
     if FLAGS.model_type == "albert_encoder":
         albert_layer = AlbertModel(config=albert_config, float_type=float_type)
 
-        pooled_output, sequence_output = albert_layer(input_word_ids, input_mask,
+        pooled_output, sequence_output, attention_output, embedding_tensor= albert_layer(input_word_ids, input_mask,
                                                   input_type_ids)
         albert_model = tf.keras.Model(
         inputs=[input_word_ids, input_mask, input_type_ids],
-        outputs=[pooled_output, sequence_output])
+        outputs=[pooled_output, sequence_output, attention_output, embedding_tensor])
         albert_params = albert_model.weights
         param_values = tf.keras.backend.batch_get_value(albert_params)
     else:

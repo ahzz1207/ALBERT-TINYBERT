@@ -235,7 +235,8 @@ def run_customized_training_loop(
       train_loss_metric.update_state(loss)
       # for metric in train_metrics:
       #   metric.update_state(labels, model_outputs)
-
+      return loss
+    
     @tf.function
     def train_steps(iterator, steps):
       """Performs distributed training steps in a loop.
@@ -252,8 +253,18 @@ def run_customized_training_loop(
         raise ValueError('steps should be an Tensor. Python object may cause '
                          'retracing.')
 
-      for _ in tf.range(steps):
-        strategy.experimental_run_v2(_replicated_step, args=(next(iterator),))
+      # strategy.experimental_run_v2(_replicated_step, args=(next(iterator)))
+      per_replica_losses = strategy.experimental_run_v2(
+        _replicated_step, args=(next(iterator),))
+      for _ in tf.range(steps-1):
+        per_replica_losses = strategy.experimental_run_v2(
+          _replicated_step, args=(next(iterator),))
+      
+      losses = tf.nest.map_structure(
+        lambda x: strategy.reduce(tf.distribute.ReduceOp.MEAN, x, axis=None),
+        per_replica_losses
+      )
+      return losses
 
     def train_single_step(iterator):
       """Performs a distributed training step.
@@ -264,7 +275,7 @@ def run_customized_training_loop(
       Raises:
         ValueError: Any of the arguments or tensor shapes are invalid.
       """
-      strategy.experimental_run_v2(_replicated_step, args=(next(iterator),))
+      return strategy.experimental_run_v2(_replicated_step, args=(next(iterator),))
 
     def test_step(iterator):
       """Calculates evaluation metrics on distributed devices."""
@@ -348,14 +359,10 @@ def run_customized_training_loop(
       # Runs several steps in the host while loop.
       steps = steps_to_run(current_step, steps_per_epoch, steps_per_loop)
 
-      if steps == 1:
-        # TODO(zongweiz): merge with train_steps once tf.while_loop
-        # GPU performance bugs are fixed.
-        train_single_step(train_iterator)
-      else:
-        # Converts steps to a Tensor to avoid tf.function retracing.
-        train_steps(train_iterator,
-                    tf.convert_to_tensor(steps, dtype=tf.int32))
+      # oen or more steps use single function
+      steps_loss = train_steps(train_iterator,
+                  tf.convert_to_tensor(steps, dtype=tf.int32))
+      
       _run_callbacks_on_batch_end(current_step)
       current_step += steps
 
@@ -368,6 +375,9 @@ def run_customized_training_loop(
         with train_summary_writer.as_default():
           tf.summary.scalar(
               train_loss_metric.name, train_loss, step=current_step)
+          # tf.summary.scalar(
+          #     "step_loss", steps_loss, step=current_step 
+          # )
           for metric in train_metrics + model.metrics:
             metric_value = _float_metric_value(metric)
             training_status += '  %s = %f' % (metric.name, metric_value)

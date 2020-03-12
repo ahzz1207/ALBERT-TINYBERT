@@ -240,11 +240,11 @@ def pretrain_model(albert_config,
   float_type = tf.float32
   albert_encoder = "albert_model"
   albert_layer = AlbertModel(config=albert_config, float_type=float_type, name=albert_encoder)
-  pooled_output, sequence_output = albert_layer(input_word_ids, input_mask,
+  pooled_output, sequence_output, attention_output, embedding_tensor = albert_layer(input_word_ids, input_mask,
                                                   input_type_ids)
   albert_submodel = tf.keras.Model(
       inputs=[input_word_ids, input_mask, input_type_ids],
-      outputs=[pooled_output, sequence_output])
+      outputs=[pooled_output, sequence_output, attention_output, embedding_tensor])
   
   pooled_output = albert_submodel.outputs[0]
   sequence_output = albert_submodel.outputs[1]

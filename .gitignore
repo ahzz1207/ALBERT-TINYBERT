@@ -118,7 +118,7 @@ glue_data/*
 # processed files
 *tf_record
 *_meta_data
-
+*.h5
 # ouptut dir
 *_OUT/*
 *_out_*/*
