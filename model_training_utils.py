@@ -35,6 +35,15 @@ def _save_checkpoint(checkpoint, model_dir, checkpoint_prefix):
   return
 
 
+class SaveBestModel(tf.keras.callbacks.Callback):
+    def __init__(self):
+      super(SaveBestModel, self).__init__()
+      self._min_loss = 999
+    def on_train_end(self, logs=None):
+      if logs['train_loss_metric'] < self._min_loss:
+        self._min_loss = logs['train_loss_metric']
+
+
 def _get_input_iterator(input_fn, strategy):
   """Returns distributed dataset iterator."""
 

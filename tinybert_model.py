@@ -334,7 +334,8 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         embeddings_loss = tf.keras.losses.MSE(y_true=albert_embedding_table, 
                                               y_pred=tinybert_embedding_table)
         embeddings_loss = tf.reduce_mean(embeddings_loss)
-        
+        self.add_metric(
+            embeddings_loss, name='embdding_loss',aggregation='mean')
         attention_loss = 0
         hidden_loss = 0
         for i in range(self.num_layers):

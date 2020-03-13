@@ -126,4 +126,4 @@ glue_data/*
 SQuAD/*
 *.zip
 # model_files
-model_out/*
+*_out*/*
