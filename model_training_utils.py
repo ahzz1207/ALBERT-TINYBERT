@@ -35,6 +35,15 @@ def _save_checkpoint(checkpoint, model_dir, checkpoint_prefix):
   return
 
 
+class SaveBestModel(tf.keras.callbacks.Callback):
+    def __init__(self):
+      super(SaveBestModel, self).__init__()
+      self._min_loss = 999
+    def on_train_end(self, logs=None):
+      if logs['train_loss_metric'] < self._min_loss:
+        self._min_loss = logs['train_loss_metric']
+
+
 def _get_input_iterator(input_fn, strategy):
   """Returns distributed dataset iterator."""
 
@@ -345,6 +354,7 @@ def run_customized_training_loop(
       else:
         tinybert.load_weights(f"{model_dir}/models/tinybert_model.h5")
         logging.info('Loading from h5 file completed')
+        
     current_step = optimizer.iterations.numpy()
     checkpoint_name = 'ctl_step_{step}.ckpt'
 
@@ -392,6 +402,7 @@ def run_customized_training_loop(
         if current_step < total_training_steps:
           _save_checkpoint(checkpoint, model_dir,
                            checkpoint_name.format(step=current_step))
+          models[1].save_weights(f"{model_dir}/models/tinybert_model.h5")
 
         if eval_input_fn:
           logging.info('Running evaluation after step: %s.', current_step)
