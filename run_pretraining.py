@@ -45,7 +45,7 @@ flags.DEFINE_string(
     "This specifies the model architecture.")
 
 flags.DEFINE_bool(
-    "start_with_train_model", True, "model restore from ckpt of trained_model ,else restore from every .h5 file")
+    "start_with_train_model", False, "model restore from ckpt of trained_model ,else restore from every .h5 file")
 
 flags.DEFINE_string(
     "tinybert_config_file", "/work/ALBERT-TF2.0-master/model_configs/base/config_tiny.json",
@@ -53,14 +53,14 @@ flags.DEFINE_string(
     "This specifies the model architecture.")
 
 flags.DEFINE_string(
-    "input_files", "/work/inputfiles_256/*.tfrecord",
+    "input_files", "/work/pretrain_data/*.tfrecord",
     "Input TF example files (can be a glob or comma separated).")
   
 flags.DEFINE_string("meta_data_file_path", None,
                     "The path in which input meta data will be written.")
 
 flags.DEFINE_string(
-    "output_dir", "/work/ALBERT-TF2.0-master/model_out2",
+    "output_dir", "/work/ALBERT-TF2.0-master/model_out3/",
     "The output directory where the model checkpoints will be written.")
 
 ## Other parameters

@@ -354,6 +354,7 @@ def run_customized_training_loop(
       else:
         tinybert.load_weights(f"{model_dir}/models/tinybert_model.h5")
         logging.info('Loading from h5 file completed')
+        
     current_step = optimizer.iterations.numpy()
     checkpoint_name = 'ctl_step_{step}.ckpt'
 
@@ -401,6 +402,7 @@ def run_customized_training_loop(
         if current_step < total_training_steps:
           _save_checkpoint(checkpoint, model_dir,
                            checkpoint_name.format(step=current_step))
+          models[1].save_weights(f"{model_dir}/models/tinybert_model.h5")
 
         if eval_input_fn:
           logging.info('Running evaluation after step: %s.', current_step)

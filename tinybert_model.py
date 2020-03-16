@@ -329,8 +329,8 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         tinybert_sequence_output = unpacked_inputs[16:22]
         albert_atten_score = unpacked_inputs[22:34]
         tinybert_atten_score = unpacked_inputs[34:40] # b*n, l, l
-        albert_logits = unpacked_inputs[40] # b, h
-        tinybert_logits = unpacked_inputs[41]
+        albert_lm_output = unpacked_inputs[40] # b, h
+        tinybert_lm_output = unpacked_inputs[41]
         embeddings_loss = tf.keras.losses.MSE(y_true=albert_embedding_table, 
                                               y_pred=tinybert_embedding_table)
         embeddings_loss = tf.reduce_mean(embeddings_loss)
@@ -353,8 +353,8 @@ class TinybertLossLayer(tf.keras.layers.Layer):
             hidden_loss += tf.reduce_mean(seq_loss)
         
         lm_out_loss_fn = tf.keras.losses.CategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
-        lm_out_loss = lm_out_loss_fn(albert_logits,
-                                    tinybert_logits)
+        lm_out_loss = lm_out_loss_fn(albert_lm_output,
+                                    tinybert_lm_output)
         lm_out_loss = tf.reduce_mean(lm_out_loss)
 
         self.add_metric(
@@ -454,9 +454,9 @@ def train_tinybert_model(tinybert_config,
     #                                   tinybert_logits=tinybert_logits,
     #                                   lm_label_ids=masked_lm_ids,
     #                                   lm_label_weights=masked_lm_weights)
-    loss_output = tinybert_loss_layer([albert_embed_tensor,tinybert_embed_tensor, teacher_pooled_output, student_pooled_output,
+    distil_loss = tinybert_loss_layer([albert_embed_tensor,tinybert_embed_tensor, teacher_pooled_output, student_pooled_output,
                                        teacher_sequence_output, student_sequence_output, teacher_atten_score, student_atten_score,
-                                       albert_logits, tinybert_logits, masked_lm_ids, masked_lm_weights])
+                                       albert_lm_output, tinybert_lm_output, masked_lm_ids, masked_lm_weights])
     
     # pretrain_loss
     tinybert_pretrain_loss_metrics_layer = TinyBertPretrainLossAndMetricLayer(tinybert_config, name="metric")
@@ -464,7 +464,7 @@ def train_tinybert_model(tinybert_config,
     pretrain_loss = tinybert_pretrain_loss_metrics_layer(tinybert_lm_output, tinybert_sentence_output, masked_lm_ids,
                                                 masked_lm_weights, next_sentence_labels)    
     # total_loss
-    total_loss = loss_output + pretrain_loss
+    total_loss = distil_loss
     
     return tf.keras.Model(
         inputs={
@@ -477,3 +477,63 @@ def train_tinybert_model(tinybert_config,
             'next_sentence_labels': next_sentence_labels},
         outputs = [total_loss, pretrain_loss],
         name = 'train_model'), albert_teacher, tinybert_student
+    
+
+def get_tinybert_mlm(tinybert_config,
+                 seq_length,
+                max_predictions_per_seq):
+    input_word_ids = tf.keras.layers.Input(
+        shape=(seq_length,), name='input_word_ids', dtype=tf.int32)
+    input_mask = tf.keras.layers.Input(
+        shape=(seq_length,), name='input_mask', dtype=tf.int32)
+    input_type_ids = tf.keras.layers.Input(
+        shape=(seq_length,), name='input_type_ids', dtype=tf.int32)
+    masked_lm_positions = tf.keras.layers.Input(
+        shape=(max_predictions_per_seq,),
+        name='masked_lm_positions',
+        dtype=tf.int32)
+    masked_lm_weights = tf.keras.layers.Input(
+        shape=(max_predictions_per_seq,),
+        name='masked_lm_weights',
+        dtype=tf.int32)
+    next_sentence_labels = tf.keras.layers.Input(
+        shape=(1,), name='next_sentence_labels', dtype=tf.int32)
+    masked_lm_ids = tf.keras.layers.Input(
+        shape=(max_predictions_per_seq,), name='masked_lm_ids', dtype=tf.int32)
+    
+    float_type = tf.float32
+    tinybert_encoder = "tinybert_model"
+    tinybert_layer = TinybertModel(config=tinybert_config, float_type=float_type, name=tinybert_encoder)
+    tinybert_pooled_output, tinybert_sequence_output, tinybert_attention_scores, tinybert_embed_tensor = tinybert_layer(input_word_ids, input_mask, input_type_ids)
+    
+    tinybert_student = tf.keras.Model(
+        inputs = [input_word_ids, input_mask, input_type_ids],
+        outputs = [tinybert_pooled_output] + tinybert_sequence_output + tinybert_attention_scores + [tinybert_embed_tensor],
+        name = 'tinybert'
+    )
+    
+    tinybert_student_outputs = tinybert_student([input_word_ids, input_mask, input_type_ids])
+    student_pooled_output = tinybert_student_outputs[0]
+    student_sequence_output = tinybert_student_outputs[1:7]
+    student_atten_score = tinybert_student_outputs[7:13]
+    student_embed_tensor = tinybert_student_outputs[13]
+    
+    tinybert_pretrain_layer = TinyBertPretrainLayer(tinybert_config,
+                                                    tinybert_layer.embedding_lookup.embeddings,
+                                                    name='tinybert_cls')
+    tinybert_lm_output, tinybert_sentence_output, tinybert_logits = tinybert_pretrain_layer(student_pooled_output, student_sequence_output[-1], masked_lm_positions)
+    tinybert_pretrain_loss_metrics_layer = TinyBertPretrainLossAndMetricLayer(tinybert_config, name="metric")
+    pretrain_loss = tinybert_pretrain_loss_metrics_layer(tinybert_lm_output, tinybert_sentence_output, masked_lm_ids,
+                                                masked_lm_weights, next_sentence_labels)
+    total_loss = pretrain_loss 
+    return tf.keras.Model(
+        inputs={
+            'input_word_ids': input_word_ids,
+            'input_mask': input_mask,
+            'input_type_ids': input_type_ids,
+            'masked_lm_positions': masked_lm_positions,
+            'masked_lm_ids': masked_lm_ids,
+            'masked_lm_weights': masked_lm_weights,
+            'next_sentence_labels': next_sentence_labels},
+        outputs = [total_loss, pretrain_loss],
+        name = 'tinybert_model'), tinybert_student
