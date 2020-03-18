@@ -107,7 +107,8 @@ def run_customized_training_loop(
     eval_steps=None,
     metric_fn=None,
     custom_callbacks=None,
-    run_eagerly=False):
+    run_eagerly=False,
+    use_mlm_loss=False):
   """Run ALBERT pretrain model training using low-level API.
 
   Arguments:
@@ -229,7 +230,10 @@ def run_customized_training_loop(
         # tinybert_out = models[1](albert_inputs, training=True)
         model_outputs = models[2](inputs, training=True)
         # loss = loss_fn(labels, model_outputs)
-        loss = model_outputs[0]
+        if not use_mlm_loss:
+          loss = model_outputs[0]
+        else:
+          loss = model_outputs[1]
       # Collects training variables.      
       training_vars = models[0].trainable_variables + models[1].trainable_variables + models[2].trainable_variables
       # 去除albert的变量

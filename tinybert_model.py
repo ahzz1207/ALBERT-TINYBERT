@@ -463,8 +463,6 @@ def train_tinybert_model(tinybert_config,
     
     pretrain_loss = tinybert_pretrain_loss_metrics_layer(tinybert_lm_output, tinybert_sentence_output, masked_lm_ids,
                                                 masked_lm_weights, next_sentence_labels)    
-    # total_loss
-    total_loss = distil_loss
     
     return tf.keras.Model(
         inputs={
@@ -475,7 +473,7 @@ def train_tinybert_model(tinybert_config,
             'masked_lm_ids': masked_lm_ids,
             'masked_lm_weights': masked_lm_weights,
             'next_sentence_labels': next_sentence_labels},
-        outputs = [total_loss, pretrain_loss],
+        outputs = [distil_loss, pretrain_loss],
         name = 'train_model'), albert_teacher, tinybert_student
     
 

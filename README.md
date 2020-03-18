@@ -199,3 +199,42 @@ End of sequence
 1. TensorFlow offical implementation of [BERT](https://github.com/tensorflow/models/tree/master/official/nlp/bert) in TF 2.0 . Lot of parts of code in this repo adapted from the above repo.
 2. LAMB optimizer from TensorFlow [addons](https://github.com/tensorflow/addons/blob/master/tensorflow_addons/optimizers/lamb.py)
 3. TF-HUB weights to TF 2.0 weights conversion : [KPE](https://github.com/kpe/bert-for-tf2)
+
+# AlBert2
+
+## Command line instructions
+
+### Git global setup
+```
+git config --global user.name "haodong"
+git config --global user.email "haodong@cloudwalk.cn"
+```
+
+### Create a new repository
+```
+git clone https://gitlab-research.cloudwalk.work/NLP/AP_10_ALBERT2.git
+cd AP_10_ALBERT2
+touch README.md
+git add README.md
+git commit -m "add README"
+git push -u origin master
+```
+
+### Existing folder
+```
+cd existing_folder
+git init
+git remote add origin https://gitlab-research.cloudwalk.work/NLP/AP_10_ALBERT2.git
+git add .
+git commit -m "Initial commit"
+git push -u origin master
+```
+
+### Existing Git repository
+```
+cd existing_repo
+git remote rename origin old-origin
+git remote add origin https://gitlab-research.cloudwalk.work/NLP/AP_10_ALBERT2.git
+git push -u origin --all
+git push -u origin --tags
+```

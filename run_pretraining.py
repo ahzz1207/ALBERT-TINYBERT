@@ -45,6 +45,10 @@ flags.DEFINE_string(
     "This specifies the model architecture.")
 
 flags.DEFINE_bool(
+    "finetune_tinybert", False, "decided witch loss will u choose to train"
+)
+
+flags.DEFINE_bool(
     "start_with_train_model", False, "model restore from ckpt of trained_model ,else restore from every .h5 file")
 
 flags.DEFINE_string(
@@ -60,12 +64,16 @@ flags.DEFINE_string("meta_data_file_path", None,
                     "The path in which input meta data will be written.")
 
 flags.DEFINE_string(
-    "output_dir", "/work/ALBERT-TF2.0-master/model_out3/",
+    "output_dir", "/work/ALBERT-TF2.0-master/model_out4/",
     "The output directory where the model checkpoints will be written.")
 
 ## Other parameters
 flags.DEFINE_string(
     "init_checkpoint", None,
+    "Initial checkpoint (usually from a pre-trained two model).")
+
+flags.DEFINE_string(
+    "init_checkpoint_albertbert", None,
     "Initial checkpoint (usually from a pre-trained ALBERT model).")
 
 flags.DEFINE_string(
@@ -101,7 +109,7 @@ flags.DEFINE_integer("steps_per_loop", 1000, "One loop run numbers steps")
 
 flags.DEFINE_integer("steps_per_epoch", 100000, "how many steps to save model")
 
-flags.DEFINE_integer("num_train_epochs", 10, "Number of training epochs.")
+flags.DEFINE_integer("num_train_epochs", 3, "Number of training epochs.")
 
 flags.DEFINE_float("warmup_proportion", 0.1, "Number of warmup steps.")
 
@@ -170,7 +178,8 @@ def run_customized_training(strategy,
                             initial_lr,
                             warmup_steps,
                             input_files,
-                            train_batch_size):
+                            train_batch_size,
+                            use_mlm_loss):
   """Run BERT pretrain model training using low-level API."""
 
   train_input_fn = functools.partial(get_pretrain_input_data, input_files,
@@ -190,7 +199,7 @@ def run_customized_training(strategy,
     # tinybert.to_json()
     if FLAGS.init_checkpoint:
       logging.info(f"model pre-trained weights loaded from {FLAGS.init_checkpoint}")
-      train_model.load_weights(FLAGS.init_checkpoint_tinybert)
+      train_model.load_weights(FLAGS.init_checkpoint)
 
     learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(initial_learning_rate=initial_lr,
                                                 decay_steps=int(steps_per_epoch*epochs),end_learning_rate=0.0)
@@ -228,7 +237,8 @@ def run_customized_training(strategy,
         train_input_fn=train_input_fn,
         steps_per_epoch=steps_per_epoch,
         steps_per_loop=steps_per_loop,
-        epochs=epochs)
+        epochs=epochs,
+        use_mlm_loss=use_mlm_loss)
   # Creates the BERT core model outside distribution strategy scope.
   training, albert, tinybert = tinybert_model.train_tinybert_model(
                                           tinybert_config, albert_config, 
@@ -298,7 +308,8 @@ def run_bert_pretrain(strategy,input_meta_data):
       FLAGS.learning_rate,
       num_warmup_steps,
       FLAGS.input_files,
-      FLAGS.train_batch_size)
+      FLAGS.train_batch_size,
+      FLAGS.finetune_tinybert)
 
 
 def main(_):
