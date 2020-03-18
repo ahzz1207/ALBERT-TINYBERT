@@ -45,7 +45,7 @@ flags.DEFINE_string(
     "This specifies the model architecture.")
 
 flags.DEFINE_bool(
-    "finetune_tinybert", False, "decided witch loss will u choose to train"
+    "finetune_tinybert", True, "decided witch loss will u choose to train"
 )
 
 flags.DEFINE_bool(
