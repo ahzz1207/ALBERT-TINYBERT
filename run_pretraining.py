@@ -35,7 +35,7 @@ from albert import AlbertConfig, AlbertModel
 from tinybert import TinybertConfig, TinybertModel
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
-# os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 FLAGS = flags.FLAGS 
 
 ## Required parameters

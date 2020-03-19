@@ -267,17 +267,12 @@ def run_customized_training_loop(
                          'retracing.')
 
       # strategy.experimental_run_v2(_replicated_step, args=(next(iterator)))
-      per_replica_losses = strategy.experimental_run_v2(
+      strategy.experimental_run_v2(
         _replicated_step, args=(next(iterator),))
       for _ in tf.range(steps-1):
-        per_replica_losses = strategy.experimental_run_v2(
+        strategy.experimental_run_v2(
           _replicated_step, args=(next(iterator),))
       
-      losses = tf.nest.map_structure(
-        lambda x: strategy.reduce(tf.distribute.ReduceOp.MEAN, x, axis=None),
-        per_replica_losses
-      )
-      return losses
 
     def train_single_step(iterator):
       """Performs a distributed training step.
@@ -374,7 +369,7 @@ def run_customized_training_loop(
       steps = steps_to_run(current_step, steps_per_epoch, steps_per_loop)
 
       # oen or more steps use single function
-      steps_loss = train_steps(train_iterator,
+      train_steps(train_iterator,
                   tf.convert_to_tensor(steps, dtype=tf.int32))
       
       _run_callbacks_on_batch_end(current_step)
@@ -389,9 +384,7 @@ def run_customized_training_loop(
         with train_summary_writer.as_default():
           tf.summary.scalar(
               train_loss_metric.name, train_loss, step=current_step)
-          # tf.summary.scalar(
-          #     "step_loss", steps_loss, step=current_step 
-          # )
+          
           for metric in train_metrics + model.metrics:
             metric_value = _float_metric_value(metric)
             training_status += '  %s = %f' % (metric.name, metric_value)

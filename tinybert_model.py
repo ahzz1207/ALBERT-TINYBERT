@@ -201,7 +201,6 @@ class TinyBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
                    lm_per_example_loss, sentence_output, sentence_labels,
                    sentence_per_example_loss):
     """Adds metrics."""
-    print(lm_output, lm_labels)
     masked_lm_accuracy = tf.keras.metrics.sparse_categorical_accuracy(
         lm_labels, lm_output)
     masked_lm_accuracy = tf.reduce_mean(masked_lm_accuracy * lm_label_weights)
@@ -464,6 +463,7 @@ def train_tinybert_model(tinybert_config,
     pretrain_loss = tinybert_pretrain_loss_metrics_layer(tinybert_lm_output, tinybert_sentence_output, masked_lm_ids,
                                                 masked_lm_weights, next_sentence_labels)    
     
+    total_loss = distil_loss
     return tf.keras.Model(
         inputs={
             'input_word_ids': input_word_ids,
@@ -473,7 +473,7 @@ def train_tinybert_model(tinybert_config,
             'masked_lm_ids': masked_lm_ids,
             'masked_lm_weights': masked_lm_weights,
             'next_sentence_labels': next_sentence_labels},
-        outputs = [distil_loss, pretrain_loss],
+        outputs = [total_loss, pretrain_loss],
         name = 'train_model'), albert_teacher, tinybert_student
     
 
