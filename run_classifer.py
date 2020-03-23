@@ -41,11 +41,11 @@ FLAGS = flags.FLAGS
 
 ## Required parameters
 flags.DEFINE_string(
-    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/train.tsv',
+    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/train.tf_record',
     "train_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tsv',
+    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tf_record',
     "eval_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
@@ -85,7 +85,7 @@ flags.DEFINE_string(
     "init_checkpoint", '/work/ALBERT-TF2.0-master/model_configs/base/albert_model.h5',
     "Initial checkpoint (usually from a pre-trained ALBERT model).")
 
-flags.DEFINE_string("input_meta_data_path",None,"input_meta_data_path")
+flags.DEFINE_string("input_meta_data_path",'/work/chineseGLUEdatasets.v0.0.1/inews/input_mate_data.json',"input_meta_data_path")
 
 
 flags.DEFINE_bool(
@@ -247,9 +247,6 @@ def main(_):
 
   if FLAGS.enable_xla:
 	  set_config_v2(FLAGS.enable_xla)
-   
-  tokenizer = tokenization.FullTokenizer(
-        vocab_file=None,spm_model_file=FLAGS.spm_model_file, do_lower_case=FLAGS.do_lower_case)
   
   processors = {
     "cola": classifier_data_lib.ColaProcessor,
@@ -280,13 +277,12 @@ def main(_):
 	  raise ValueError('The distribution strategy type is not supported: %s' %
                      FLAGS.strategy_type)
 
-  
-    # with tf.io.gfile.GFile(FLAGS.input_meta_data_path, 'rb') as reader:
-    #     input_meta_data = json.loads(reader.read().decode('utf-8'))
+  with tf.io.gfile.GFile(FLAGS.input_meta_data_path, 'rb') as reader:
+    input_meta_data = json.loads(reader.read().decode('utf-8'))
 
-    # num_labels = input_meta_data["num_labels"]
-    # FLAGS.max_seq_length = input_meta_data["max_seq_length"]
-    # processor_type = input_meta_data['processor_type']
+    num_labels = input_meta_data["num_labels"]
+    FLAGS.max_seq_length = input_meta_data["max_seq_length"]
+    processor_type = input_meta_data['processor_type']
 
   if not FLAGS.do_train and not FLAGS.do_eval and not FLAGS.do_predict:
     raise ValueError(
@@ -405,7 +401,7 @@ def main(_):
     flags.mark_flag_as_required("input_data_dir")
     flags.mark_flag_as_required("predict_data_path")
     tokenizer = tokenization.FullTokenizer(
-        vocab_file=None,spm_model_file=FLAGS.spm_model_file, do_lower_case=FLAGS.do_lower_case)
+        vocab_file=FLAGS.vocab_file)
 
     predict_examples = processor.get_test_examples(FLAGS.input_data_dir)
 

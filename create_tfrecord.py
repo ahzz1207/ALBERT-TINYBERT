@@ -39,6 +39,7 @@ def create_train_dev_file():
     
     input_meta_data = {"max_seq_length": 256,
                        "train_data_size": 0,
+                       "eval_data_size": 0,
                         "num_labels": 0,
                        "processor_type": None}
     
@@ -78,7 +79,8 @@ def create_train_dev_file():
     eval_examples, _ = processor.get_dev_examples(FLAGS.input_data_dir)
     label_list = processor.get_labels(labels)
     label_map = {i:label for i,label in enumerate(label_list)}
-
+    input_meta_data["eval_data_size"] = len(eval_examples)
+    
     classifier_data_lib.file_based_convert_examples_to_features(eval_examples,
                                         label_list, FLAGS.max_seq_length,
                                         tokenizer, FLAGS.eval_data_path)
