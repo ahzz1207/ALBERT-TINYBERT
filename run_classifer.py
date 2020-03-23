@@ -72,7 +72,7 @@ flags.DEFINE_string("spm_model_file", None,
                     "The model file for sentence piece tokenization.")
 
 flags.DEFINE_string(
-    "output_dir", './inews/out',
+    "output_dir", './fine_tune_out/inews',
     "The output directory where the model checkpoints will be written.")
 
 flags.DEFINE_enum(
@@ -187,7 +187,7 @@ def get_model(albert_config, max_seq_length, num_labels, init_checkpoint, learni
 
     albert_layer = AlbertModel(config=albert_config, float_type=float_type)
 
-    pooled_output, _ = albert_layer(input_word_ids, input_mask, input_type_ids)
+    pooled_output, _, _, _ = albert_layer(input_word_ids, input_mask, input_type_ids)
 
     albert_model = tf.keras.Model(inputs=[input_word_ids,input_mask,input_type_ids],
                                   outputs=[pooled_output])
@@ -451,7 +451,6 @@ if __name__ == "__main__":
   flags.mark_flag_as_required("eval_data_path")
   flags.mark_flag_as_required("input_meta_data_path")
   flags.mark_flag_as_required("init_checkpoint")
-  flags.mark_flag_as_required("spm_model_file")
   flags.mark_flag_as_required("albert_config_file")
   flags.mark_flag_as_required("output_dir")
   app.run(main)

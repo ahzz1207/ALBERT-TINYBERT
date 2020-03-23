@@ -11,7 +11,7 @@ flags.DEFINE_string(
     "train_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tf_record ',
+    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tf_record',
     "eval_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
