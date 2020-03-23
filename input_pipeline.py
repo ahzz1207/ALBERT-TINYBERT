@@ -39,7 +39,7 @@ def decode_record(record, name_to_features):
 
 def file_based_input_fn_builder(input_file, name_to_features):
   """Creates an `input_fn` closure to be passed for BERT custom training."""
-
+  # 读取的是tf record格式文件
   def input_fn():
     """Returns dataset for training/evaluation."""
     # For training, we want a lot of parallel reading and shuffling.
@@ -83,7 +83,7 @@ def create_pretrain_dataset(input_patterns,
   }
 
   dataset = tf.data.Dataset.list_files(input_patterns, shuffle=is_training)
-
+  print("dataset is :", dataset)
   if input_pipeline_context and input_pipeline_context.num_input_pipelines > 1:
     dataset = dataset.shard(input_pipeline_context.num_input_pipelines,
                             input_pipeline_context.input_pipeline_id)
@@ -135,6 +135,7 @@ def create_pretrain_dataset(input_patterns,
 
   dataset = dataset.batch(batch_size, drop_remainder=True)
   dataset = dataset.prefetch(1024)
+  print("dataset length :", len(dataset))
   return dataset
 
 

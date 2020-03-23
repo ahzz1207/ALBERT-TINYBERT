@@ -36,43 +36,43 @@ from albert import AlbertConfig, AlbertModel
 from input_pipeline import create_classifier_dataset
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
-
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 FLAGS = flags.FLAGS
 
 ## Required parameters
 flags.DEFINE_string(
-    "train_data_path", None,
+    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/train.tsv',
     "train_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "eval_data_path", None,
+    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tsv',
     "eval_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "predict_data_path", None,
+    "predict_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/test.tsv',
     "predict_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "input_data_dir", None,
+    "input_data_dir", '/work/chineseGLUEdatasets.v0.0.1/inews/',
     "The input data dir. Should contain the .tsv files (or other data files) "
     "for the task.")
 
 flags.DEFINE_string(
-    "albert_config_file", None,
+    "albert_config_file", '/work/ALBERT-TF2.0-master/model_configs/base/config_tiny.json',
     "The config json file corresponding to the pre-trained ALBERT model. "
     "This specifies the model architecture.")
 
-flags.DEFINE_string("task_name", None, "The name of the task to train.")
+flags.DEFINE_string("task_name", 'inews', "The name of the task to train.")
 
 flags.DEFINE_string(
-    "vocab_file", None,
+    "vocab_file", '/work/ALBERT-TF2.0-master/model_configs/base/vocab_chinese.txt',
     "The vocabulary file that the ALBERT model was trained on.")
 
 flags.DEFINE_string("spm_model_file", None,
                     "The model file for sentence piece tokenization.")
 
 flags.DEFINE_string(
-    "output_dir", None,
+    "output_dir", './inews/out',
     "The output directory where the model checkpoints will be written.")
 
 flags.DEFINE_enum(
@@ -82,7 +82,7 @@ flags.DEFINE_enum(
 ## Other parameters
 
 flags.DEFINE_string(
-    "init_checkpoint", None,
+    "init_checkpoint", '/work/ALBERT-TF2.0-master/model_configs/base/albert_model.h5',
     "Initial checkpoint (usually from a pre-trained ALBERT model).")
 
 flags.DEFINE_string("input_meta_data_path",None,"input_meta_data_path")
@@ -94,16 +94,16 @@ flags.DEFINE_bool(
     "models and False for cased models.")
 
 flags.DEFINE_integer(
-    "max_seq_length", 512,
+    "max_seq_length", 256,
     "The maximum total input sequence length after WordPiece tokenization. "
     "Sequences longer than this will be truncated, and sequences shorter "
     "than this will be padded.")
 
 flags.DEFINE_float("classifier_dropout",0.1,"classification layer dropout")
 
-flags.DEFINE_bool("do_train", False, "Whether to run training.")
+flags.DEFINE_bool("do_train", True, "Whether to run training.")
 
-flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
+flags.DEFINE_bool("do_eval", True, "Whether to run eval on the dev set.")
 
 flags.DEFINE_bool("do_predict", False ,"Whether to run prediction on the test set")
 
@@ -247,7 +247,30 @@ def main(_):
 
   if FLAGS.enable_xla:
 	  set_config_v2(FLAGS.enable_xla)
+   
+  tokenizer = tokenization.FullTokenizer(
+        vocab_file=None,spm_model_file=FLAGS.spm_model_file, do_lower_case=FLAGS.do_lower_case)
+  
+  processors = {
+    "cola": classifier_data_lib.ColaProcessor,
+    "sts": classifier_data_lib.StsbProcessor,
+    "sst": classifier_data_lib.Sst2Processor,
+    "mnli": classifier_data_lib.MnliProcessor,
+    "qnli": classifier_data_lib.QnliProcessor,
+    "qqp": classifier_data_lib.QqpProcessor,
+    "rte": classifier_data_lib.RteProcessor,
+    "mrpc": classifier_data_lib.MrpcProcessor,
+    "wnli": classifier_data_lib.WnliProcessor,
+    "xnli": classifier_data_lib.XnliProcessor,
+    "inews": classifier_data_lib.InewsProcessor,
+    }
+  task_name = FLAGS.task_name.lower()
+  if task_name not in processors:
+        raise ValueError("Task not found: %s" % (task_name))
 
+  processor = processors[task_name]()
+  logging.info("processor is : ", FLAGS.task_name)
+  
   strategy = None
   if FLAGS.strategy_type == "one":
 	  strategy = tf.distribute.OneDeviceStrategy("GPU:0")
@@ -257,12 +280,13 @@ def main(_):
 	  raise ValueError('The distribution strategy type is not supported: %s' %
                      FLAGS.strategy_type)
 
-  with tf.io.gfile.GFile(FLAGS.input_meta_data_path, 'rb') as reader:
-    input_meta_data = json.loads(reader.read().decode('utf-8'))
+  
+    # with tf.io.gfile.GFile(FLAGS.input_meta_data_path, 'rb') as reader:
+    #     input_meta_data = json.loads(reader.read().decode('utf-8'))
 
-  num_labels = input_meta_data["num_labels"]
-  FLAGS.max_seq_length = input_meta_data["max_seq_length"]
-  processor_type = input_meta_data['processor_type']
+    # num_labels = input_meta_data["num_labels"]
+    # FLAGS.max_seq_length = input_meta_data["max_seq_length"]
+    # processor_type = input_meta_data['processor_type']
 
   if not FLAGS.do_train and not FLAGS.do_eval and not FLAGS.do_predict:
     raise ValueError(
@@ -281,6 +305,7 @@ def main(_):
   num_train_steps = None
   num_warmup_steps = None
   steps_per_epoch = None
+  
   if FLAGS.do_train:
     len_train_examples = input_meta_data['train_data_size']
     steps_per_epoch = int(len_train_examples / FLAGS.train_batch_size)
@@ -308,6 +333,8 @@ def main(_):
     logging.info("  Batch size = %d", FLAGS.train_batch_size)
     logging.info("  Num steps = %d", num_train_steps)
 
+
+    # 为create方法固定4个参数值
     train_input_fn = functools.partial(
       create_classifier_dataset,
       FLAGS.train_data_path,
@@ -380,37 +407,19 @@ def main(_):
     tokenizer = tokenization.FullTokenizer(
         vocab_file=None,spm_model_file=FLAGS.spm_model_file, do_lower_case=FLAGS.do_lower_case)
 
-    processors = {
-    "cola": classifier_data_lib.ColaProcessor,
-    "sts": classifier_data_lib.StsbProcessor,
-    "sst": classifier_data_lib.Sst2Processor,
-    "mnli": classifier_data_lib.MnliProcessor,
-    "qnli": classifier_data_lib.QnliProcessor,
-    "qqp": classifier_data_lib.QqpProcessor,
-    "rte": classifier_data_lib.RteProcessor,
-    "mrpc": classifier_data_lib.MrpcProcessor,
-    "wnli": classifier_data_lib.WnliProcessor,
-    "xnli": classifier_data_lib.XnliProcessor,
-    }
-    task_name = FLAGS.task_name.lower()
-    if task_name not in processors:
-        raise ValueError("Task not found: %s" % (task_name))
-
-    processor = processors[task_name]()
-
     predict_examples = processor.get_test_examples(FLAGS.input_data_dir)
 
     label_list = processor.get_labels()
     label_map = {i:label for i,label in enumerate(label_list)}
 
     classifier_data_lib.file_based_convert_examples_to_features(predict_examples,
-                                        label_list, input_meta_data['max_seq_length'],
+                                        label_list, FLAGS.max_seq_length,
                                         tokenizer, FLAGS.predict_data_path)
 
     predict_input_fn = functools.partial(
     create_classifier_dataset,
     FLAGS.predict_data_path,
-    seq_length=input_meta_data['max_seq_length'],
+    seq_length=FLAGS.max_seq_length,
     batch_size=FLAGS.eval_batch_size,
     is_training=False,
     drop_remainder=False)

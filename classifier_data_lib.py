@@ -113,6 +113,22 @@ class DataProcessor(object):
       for line in reader:
         lines.append(line)
       return lines
+  
+  @classmethod
+  def _read_txt(cls, input_file, quotechar=None):
+    """Reads a tab separated value file."""
+    lines = []
+    with tf.io.gfile.GFile(input_file, "r") as f:
+      for line in f.readlines():
+        lines.append(line.split("_!_"))
+    return lines
+    
+
+  def process_text(self, text):
+    if self.use_spm:
+      return tokenization.preprocess_text(text, lower=self.do_lower_case)
+    else:
+      return tokenization.process_text(text)
 
 
 class XnliProcessor(DataProcessor):
@@ -124,18 +140,17 @@ class XnliProcessor(DataProcessor):
   def get_train_examples(self, data_dir):
     """See base class."""
     lines = self._read_tsv(
-        os.path.join(data_dir, "multinli",
-                     "multinli.train.%s.tsv" % self.language))
+        os.path.join(data_dir, "train.tsv"))
     examples = []
     for (i, line) in enumerate(lines):
       if i == 0:
         continue
       guid = "train-%d" % (i)
-      text_a = tokenization.convert_to_unicode(line[0])
-      text_b = tokenization.convert_to_unicode(line[1])
-      label = tokenization.convert_to_unicode(line[2])
-      if label == tokenization.convert_to_unicode("contradictory"):
-        label = tokenization.convert_to_unicode("contradiction")
+      text_a = tokenization.process_text(line[0])
+      text_b = tokenization.process_text(line[1])
+      label = tokenization.process_text(line[2])
+      if label == tokenization.process_text("contradictory"):
+        label = tokenization.process_text("contradiction")
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
@@ -148,12 +163,12 @@ class XnliProcessor(DataProcessor):
       if i == 0:
         continue
       guid = "dev-%d" % (i)
-      language = tokenization.convert_to_unicode(line[0])
-      if language != tokenization.convert_to_unicode(self.language):
+      language = tokenization.process_text(line[0])
+      if language != tokenization.process_text(self.language):
         continue
-      text_a = tokenization.convert_to_unicode(line[6])
-      text_b = tokenization.convert_to_unicode(line[7])
-      label = tokenization.convert_to_unicode(line[1])
+      text_a = tokenization.process_text(line[6])
+      text_b = tokenization.process_text(line[7])
+      label = tokenization.process_text(line[1])
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
@@ -166,6 +181,7 @@ class XnliProcessor(DataProcessor):
   def get_processor_name():
     """See base class."""
     return "XNLI"
+
 
 class MnliProcessor(DataProcessor):
   """Processor for the MultiNLI data set (GLUE version)."""
@@ -258,6 +274,48 @@ class MrpcProcessor(DataProcessor):
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
+
+
+class InewsProcessor(DataProcessor):
+  """Processor for the MRPC data set (GLUE version)."""
+
+  def get_train_examples(self, data_dir):
+    """See base class."""
+    return self._create_examples(
+        self._read_txt(os.path.join(data_dir, "train.tsv")), "train")
+
+  def get_dev_examples(self, data_dir):
+    """See base class."""
+    return self._create_examples(
+        self._read_txt(os.path.join(data_dir, "dev.tsv")), "dev")
+
+  def get_test_examples(self, data_dir):
+    """See base class."""
+    return self._create_examples(
+        self._read_txt(os.path.join(data_dir, "test.tsv")), "test")
+
+  def get_labels(self, labels):
+    """See base class."""
+    return set(labels)
+
+  def _create_examples(self, lines, set_type):
+    """Creates examples for the training and dev sets."""
+    examples = []
+    labels = []
+    for (i, line) in enumerate(lines):
+      if i == 0:
+        continue
+      guid = "%s-%s" % (set_type, i)
+      text_a = tokenization.preprocess_text(line[2])
+      text_b = tokenization.preprocess_text(line[3])
+      if set_type == "test":
+        label = "0"
+      else:
+        label = tokenization.preprocess_text(line[0])
+      labels.append(label)
+      examples.append(
+          InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+    return examples, labels
 
 
 class ColaProcessor(DataProcessor):
@@ -659,7 +717,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
         label_id=0,
         is_real_example=False)
 
-  if FLAGS.classification_task_name.lower() != "sts":
+  if FLAGS.task_name.lower() != "sts":
     label_map = {}
     for (i, label) in enumerate(label_list):
       label_map[label] = i
@@ -730,7 +788,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   assert len(input_mask) == max_seq_length
   assert len(segment_ids) == max_seq_length
 
-  if FLAGS.classification_task_name.lower() != "sts":
+  if FLAGS.task_name.lower() != "sts":
     label_id = label_map[example.label]
   else:
     label_id = example.label
@@ -781,7 +839,7 @@ def file_based_convert_examples_to_features(examples, label_list,
     features["input_mask"] = create_int_feature(feature.input_mask)
     features["segment_ids"] = create_int_feature(feature.segment_ids)
     features["label_ids"] = create_float_feature([feature.label_id])\
-        if FLAGS.classification_task_name.lower() == "sts" else create_int_feature([feature.label_id])
+        if FLAGS.task_name.lower() == "sts" else create_int_feature([feature.label_id])
     features["is_real_example"] = create_int_feature(
         [int(feature.is_real_example)])
 
