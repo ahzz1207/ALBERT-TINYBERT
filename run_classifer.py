@@ -32,7 +32,10 @@ from six.moves import zip
 
 import classifier_data_lib
 import tokenization
+import albert_model
+import tinybert_model
 from albert import AlbertConfig, AlbertModel
+from tinybert import TinybertConfig, TinybertModel
 from input_pipeline import create_classifier_dataset
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
@@ -58,7 +61,12 @@ flags.DEFINE_string(
     "for the task.")
 
 flags.DEFINE_string(
-    "albert_config_file", '/work/ALBERT-TF2.0-master/model_configs/base/config_tiny.json',
+    "tinybert_config_file", "/work/ALBERT-TF2.0-master/model_configs/base/config_tiny.json",
+    "The config json file corresponding to the pre-trained TINYBERT model. "
+    "This specifies the model architecture.")
+
+flags.DEFINE_string(
+    "albert_config_file", '/work/ALBERT-TF2.0-master/model_configs/base/config.json',
     "The config json file corresponding to the pre-trained ALBERT model. "
     "This specifies the model architecture.")
 
@@ -117,7 +125,7 @@ flags.DEFINE_float("weight_decay", 0.01, "weight_decay")
 
 flags.DEFINE_float("adam_epsilon", 1e-6, "adam_epsilon")
 
-flags.DEFINE_integer("num_train_epochs", 3,
+flags.DEFINE_integer("num_train_epochs", 50,
                    "Total number of training epochs to perform.")
 
 flags.DEFINE_bool("enable_xla",False, "enables XLA")
@@ -129,7 +137,7 @@ flags.DEFINE_float(
 
 flags.DEFINE_enum("optimizer","AdamW",["LAMB","AdamW"],"Optimizer for training LAMB/AdamW")
 
-flags.DEFINE_bool("custom_training_loop",False,"Use Cutsom training loop instead of model.fit")
+flags.DEFINE_bool("custom_training_loop",True,"Use Cutsom training loop instead of model.fit")
 
 flags.DEFINE_integer("seed", 42, "random_seed")
 
@@ -172,6 +180,14 @@ def get_loss_fn_v2(loss_factor=1.0):
         return loss
     
     return sts_loss_fn
+
+def get_loss_fn_v3(loss_factor=1.0):
+  """Returns loss function for BERT pretraining."""
+
+  def _bert_pretrain_loss_fn(unused_labels, losses, **unused_args):
+    return tf.keras.backend.mean(losses) * loss_factor
+
+  return _bert_pretrain_loss_fn
 
 def get_model(albert_config, max_seq_length, num_labels, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps,loss_multiplier):
@@ -311,17 +327,6 @@ def main(_):
 
   loss_multiplier = 1.0 / strategy.num_replicas_in_sync
 
-  with strategy.scope():
-	  model = get_model(
-		  albert_config=albert_config,
-		  max_seq_length=FLAGS.max_seq_length,
-		  num_labels=num_labels,
-		  init_checkpoint=FLAGS.init_checkpoint,
-		  learning_rate=FLAGS.learning_rate,
-		  num_train_steps=num_train_steps,
-		  num_warmup_steps=num_warmup_steps,
-          loss_multiplier=loss_multiplier)
-  model.summary()
 
   if FLAGS.do_train:
     logging.info("***** Running training *****")
@@ -365,18 +370,65 @@ def main(_):
                 loss_fn = get_loss_fn_v2(loss_factor=loss_multiplier)
             else:
                 loss_fn = get_loss_fn(num_labels,loss_factor=loss_multiplier)
+            
+            tinybert_config = TinybertConfig.from_json_file(FLAGS.tinybert_config_file) 
+               
+            train_model, albert, tinybert = tinybert_model.get_fine_tune_model(
+                                                        tinybert_config, 
+                                                        albert_config, 
+                                                        FLAGS.max_seq_length)
+            albert.summary()
+            tinybert.summary()
+            train_model.summary()
+            
+            if FLAGS.optimizer == "LAMB":
+                optimizer_fn = LAMB
+            else:
+                optimizer_fn = AdamWeightDecay
+
+            learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(initial_learning_rate=FLAGS.learning_rate,
+                                                        decay_steps=num_train_steps,end_learning_rate=0.0)
+            if num_warmup_steps:
+                learning_rate_fn = WarmUp(initial_learning_rate=FLAGS.learning_rate,
+                                        decay_schedule_fn=learning_rate_fn,
+                                        warmup_steps=num_warmup_steps)
+                
+            optimizer = optimizer_fn(
+                learning_rate=learning_rate_fn,
+                weight_decay_rate=FLAGS.weight_decay,
+                beta_1=0.9,
+                beta_2=0.999,
+                epsilon=FLAGS.adam_epsilon,
+                exclude_from_weight_decay=['layer_norm', 'bias'])
+    
+            train_model.optimizer = optimizer
+
             model = run_customized_training_loop(strategy = strategy,
-                    model = model,
-                    loss_fn = loss_fn,
-                    model_dir = checkpoint_path,
+                    models = [albert, tinybert, train_model],
+                    model = train_model,
+                    albert=albert,
+                    tinybert=tinybert,
+                    loss_fn=get_loss_fn_v3(
+                        loss_factor=1.0 /
+                        strategy.num_replicas_in_sync),
+                    model_dir = FLAGS.output_dir,
                     train_input_fn = train_input_fn,
                     steps_per_epoch = steps_per_epoch,
                     epochs=FLAGS.num_train_epochs,
-                    eval_input_fn = eval_input_fn,
-                    eval_steps = int(input_meta_data['eval_data_size']/FLAGS.eval_batch_size),
                     metric_fn = metric_fn,
                     custom_callbacks = custom_callbacks)
         else:
+            with strategy.scope():
+                model = get_model(
+                    albert_config=albert_config,
+                    max_seq_length=FLAGS.max_seq_length,
+                    num_labels=num_labels,
+                    init_checkpoint=FLAGS.init_checkpoint,
+                    learning_rate=FLAGS.learning_rate,
+                    num_train_steps=num_train_steps,
+                    num_warmup_steps=num_warmup_steps,
+                    loss_multiplier=loss_multiplier)
+            model.summary()
             training_dataset = train_input_fn()
             evaluation_dataset = eval_input_fn()
             model.fit(x=training_dataset,validation_data=evaluation_dataset,epochs=FLAGS.num_train_epochs,callbacks=custom_callbacks)

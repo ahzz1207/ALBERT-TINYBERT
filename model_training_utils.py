@@ -228,14 +228,15 @@ def run_customized_training_loop(
       with tf.GradientTape() as tape:
         # albert_out = models[0](albert_inputs, training=False)
         # tinybert_out = models[1](albert_inputs, training=True)
-        model_outputs = models[2](inputs, training=True)
+        model_outputs = model(inputs, training=True)
+        print(model_outputs)
         # loss = loss_fn(labels, model_outputs)
         if not use_mlm_loss:
-          loss = model_outputs[0]
+          loss = model_outputs
         else:
-          loss = model_outputs[1]
+          loss = model_outputs[-1]
       # Collects training variables.      
-      training_vars = models[0].trainable_variables + models[1].trainable_variables + models[2].trainable_variables
+      training_vars = models[-1].trainable_variables
       # 去除albert的变量
       # tv = []
       # for v in training_vars:

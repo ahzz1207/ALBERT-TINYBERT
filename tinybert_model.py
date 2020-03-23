@@ -328,8 +328,7 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         tinybert_sequence_output = unpacked_inputs[16:22]
         albert_atten_score = unpacked_inputs[22:34]
         tinybert_atten_score = unpacked_inputs[34:40] # b*n, l, l
-        albert_lm_output = unpacked_inputs[40] # b, h
-        tinybert_lm_output = unpacked_inputs[41]
+        
         embeddings_loss = tf.keras.losses.MSE(y_true=albert_embedding_table, 
                                               y_pred=tinybert_embedding_table)
         embeddings_loss = tf.reduce_mean(embeddings_loss)
@@ -338,7 +337,6 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         attention_loss = 0
         hidden_loss = 0
         for i in range(self.num_layers):
-            #print(albert_atten_score, tinybert_atten_score, albert_sequence_output, tinybert_sequence_output)
             y = albert_atten_score[i*2+1]
             x = tinybert_atten_score[i]
             y_true = tf.where(y < -1e2, y, tf.zeros_like(y))
@@ -351,17 +349,11 @@ class TinybertLossLayer(tf.keras.layers.Layer):
                                             y_pred=tinybert_sequence_output[i])
             hidden_loss += tf.reduce_mean(seq_loss)
         
-        lm_out_loss_fn = tf.keras.losses.CategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
-        lm_out_loss = lm_out_loss_fn(albert_lm_output,
-                                    tinybert_lm_output)
-        lm_out_loss = tf.reduce_mean(lm_out_loss)
-
         self.add_metric(
             hidden_loss, name='hidden_loss',aggregation='mean')
         self.add_metric(
             attention_loss, name='attention_loss', aggregation='mean'
         )
-        self.add_metric(lm_out_loss, name='lm_out_loss', aggregation='mean')
 
         return attention_loss + hidden_loss 
     
@@ -535,3 +527,61 @@ def get_tinybert_mlm(tinybert_config,
             'next_sentence_labels': next_sentence_labels},
         outputs = [total_loss, pretrain_loss],
         name = 'tinybert_model'), tinybert_student
+    
+def get_fine_tune_model(tinybert_config,
+                   albert_config,
+                   seq_length):
+    input_word_ids = tf.keras.layers.Input(
+        shape=(seq_length,), name='input_word_ids', dtype=tf.int32)
+    input_mask = tf.keras.layers.Input(
+        shape=(seq_length,), name='input_mask', dtype=tf.int32)
+    input_type_ids = tf.keras.layers.Input(
+        shape=(seq_length,), name='input_type_ids', dtype=tf.int32)
+    
+    ##bert_base teacher
+    float_type = tf.float32
+    albert_encoder = "albert_model"
+    albert_layer = AlbertModel(config=albert_config, float_type=float_type, name=albert_encoder, trainable=False)
+    albert_pooled_output, albert_sequence_output, albert_attention_scores, albert_embed_tensor = albert_layer(input_word_ids, input_mask,input_type_ids)
+    ##tinybert student
+    float_type = tf.float32
+    tinybert_encoder = "tinybert_model"
+    tinybert_layer = TinybertModel(config=tinybert_config, float_type=float_type, name=tinybert_encoder)
+    tinybert_pooled_output, tinybert_sequence_output, tinybert_attention_scores, tinybert_embed_tensor = tinybert_layer(input_word_ids, input_mask, input_type_ids)
+    
+    albert_teacher = tf.keras.Model(
+        inputs = [input_word_ids, input_mask, input_type_ids],
+        outputs = [albert_pooled_output] + albert_sequence_output + albert_attention_scores + [albert_embed_tensor],
+        name = 'albert'
+    )
+    
+    tinybert_student = tf.keras.Model(
+        inputs = [input_word_ids, input_mask, input_type_ids],
+        outputs = [tinybert_pooled_output] + tinybert_sequence_output + tinybert_attention_scores + [tinybert_embed_tensor],
+        name = 'tinybert'
+    )
+    
+    albert_teacher_outputs = albert_teacher([input_word_ids, input_mask, input_type_ids])
+    tinybert_student_outputs = tinybert_student([input_word_ids, input_mask, input_type_ids])
+    
+    print(albert_teacher_outputs, tinybert_student_outputs)
+    teacher_pooled_output = albert_teacher_outputs[0]
+    teacher_sequence_output = albert_teacher_outputs[1:13]
+    teacher_atten_score = albert_teacher_outputs[13:25]
+    teacher_embed_tensor = albert_teacher_outputs[25]
+    student_pooled_output = tinybert_student_outputs[0]
+    student_sequence_output = tinybert_student_outputs[1:7]
+    student_atten_score = tinybert_student_outputs[7:13]
+    student_embed_tensor = tinybert_student_outputs[13]
+    
+    tinybert_loss_layer = TinybertLossLayer(tinybert_config, initializer=None, name="dislit")
+    distil_loss = tinybert_loss_layer([albert_embed_tensor,tinybert_embed_tensor, teacher_pooled_output, student_pooled_output,
+                                       teacher_sequence_output, student_sequence_output, teacher_atten_score, student_atten_score,])
+    
+    return tf.keras.Model(
+        inputs={
+            'input_word_ids': input_word_ids,
+            'input_mask': input_mask,
+            'input_type_ids': input_type_ids,},
+        outputs = [distil_loss],
+        name = 'fine_tune_model'), albert_teacher, tinybert_student

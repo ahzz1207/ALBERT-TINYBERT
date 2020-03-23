@@ -194,9 +194,7 @@ def run_customized_training(strategy,
     albert.summary()
     tinybert.summary()
     train_model.summary()
-    # train_model.to_json()
-    # albert.to_json()
-    # tinybert.to_json()
+    
     if FLAGS.init_checkpoint:
       logging.info(f"model pre-trained weights loaded from {FLAGS.init_checkpoint}")
       train_model.load_weights(FLAGS.init_checkpoint)
