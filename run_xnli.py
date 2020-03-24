@@ -44,7 +44,7 @@ FLAGS = flags.FLAGS
 
 ## Required parameters
 flags.DEFINE_string(
-    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/train.tf_record',
+    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/xnli/train.tf_record',
     "train_data path for tfrecords for the task.")
 
 flags.DEFINE_string(

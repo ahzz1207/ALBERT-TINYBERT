@@ -124,11 +124,11 @@ class DataProcessor(object):
     return lines
     
 
-  def process_text(self, text):
+  def preprocess_text(self, text):
     if self.use_spm:
       return tokenization.preprocess_text(text, lower=self.do_lower_case)
     else:
-      return tokenization.process_text(text)
+      return tokenization.preprocess_text(text)
 
 
 class XnliProcessor(DataProcessor):
@@ -146,29 +146,29 @@ class XnliProcessor(DataProcessor):
       if i == 0:
         continue
       guid = "train-%d" % (i)
-      text_a = tokenization.process_text(line[0])
-      text_b = tokenization.process_text(line[1])
-      label = tokenization.process_text(line[2])
-      if label == tokenization.process_text("contradictory"):
-        label = tokenization.process_text("contradiction")
+      text_a = tokenization.preprocess_text(line[0])
+      text_b = tokenization.preprocess_text(line[1])
+      label = tokenization.preprocess_text(line[2])
+      if label == tokenization.preprocess_text("contradictory"):
+        label = tokenization.preprocess_text("contradiction")
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
 
   def get_dev_examples(self, data_dir):
     """See base class."""
-    lines = self._read_tsv(os.path.join(data_dir, "xnli.dev.tsv"))
+    lines = self._read_tsv(os.path.join(data_dir, "dev.tsv"))
     examples = []
     for (i, line) in enumerate(lines):
       if i == 0:
         continue
       guid = "dev-%d" % (i)
-      language = tokenization.process_text(line[0])
-      if language != tokenization.process_text(self.language):
+      language = tokenization.preprocess_text(line[0])
+      if language != tokenization.preprocess_text(self.language):
         continue
-      text_a = tokenization.process_text(line[6])
-      text_b = tokenization.process_text(line[7])
-      label = tokenization.process_text(line[1])
+      text_a = tokenization.preprocess_text(line[6])
+      text_b = tokenization.preprocess_text(line[7])
+      label = tokenization.preprocess_text(line[1])
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples

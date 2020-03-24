@@ -354,7 +354,8 @@ class TinybertLossLayer(tf.keras.layers.Layer):
         self.add_metric(
             attention_loss, name='attention_loss', aggregation='mean'
         )
-
+        self.add_loss(attention_loss)
+        self.add_loss(hidden_loss)
         return attention_loss + hidden_loss 
     
     
