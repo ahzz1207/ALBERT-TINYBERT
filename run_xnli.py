@@ -39,7 +39,7 @@ from tinybert import TinybertConfig, TinybertModel
 from input_pipeline import create_classifier_dataset
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
-os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+os.environ["CUDA_VISIBLE_DEVICES"] = '2,3,4,5'
 FLAGS = flags.FLAGS
 
 ## Required parameters
@@ -48,15 +48,15 @@ flags.DEFINE_string(
     "train_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tf_record',
+    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/xnli/dev.tf_record',
     "eval_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "predict_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/test.tsv',
+    "predict_data_path", '/work/chineseGLUEdatasets.v0.0.1/xnli/test.tsv',
     "predict_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "input_data_dir", '/work/chineseGLUEdatasets.v0.0.1/inews/',
+    "input_data_dir", '/work/chineseGLUEdatasets.v0.0.1/xnli/',
     "The input data dir. Should contain the .tsv files (or other data files) "
     "for the task.")
 
@@ -70,7 +70,7 @@ flags.DEFINE_string(
     "The config json file corresponding to the pre-trained ALBERT model. "
     "This specifies the model architecture.")
 
-flags.DEFINE_string("task_name", 'inews', "The name of the task to train.")
+flags.DEFINE_string("task_name", 'xnli', "The name of the task to train.")
 
 flags.DEFINE_string(
     "vocab_file", '/work/ALBERT-TF2.0-master/model_configs/base/vocab_chinese.txt',
@@ -80,20 +80,20 @@ flags.DEFINE_string("spm_model_file", None,
                     "The model file for sentence piece tokenization.")
 
 flags.DEFINE_string(
-    "output_dir", './fine_tune_out/inews/tinybert',
+    "output_dir", './fine_tune_out/xnli/',
     "The output directory where the model checkpoints will be written.")
 
 flags.DEFINE_enum(
-    "strategy_type", "one", ["one", "mirror"],
+    "strategy_type", "mirror", ["one", "mirror"],
     "Training strategy for single or multi gpu training")
 
 ## Other parameters
 
 flags.DEFINE_string(
-    "init_checkpoint", '/work/ALBERT-TF2.0-master/fine_tune_out/inews/models/tinybert_model.h5',
+    "init_checkpoint", '/work/ALBERT-TF2.0-master/fine_tune_out/xnli/models/albert_model.h5',
     "Initial checkpoint (usually from a pre-trained ALBERT model).")
 
-flags.DEFINE_string("input_meta_data_path",'/work/chineseGLUEdatasets.v0.0.1/inews/input_mate_data.json',"input_meta_data_path")
+flags.DEFINE_string("input_meta_data_path",'/work/chineseGLUEdatasets.v0.0.1/xnli/input_mate_data.json',"input_meta_data_path")
 
 
 flags.DEFINE_bool(
@@ -115,7 +115,7 @@ flags.DEFINE_bool("do_eval", True, "Whether to run eval on the dev set.")
 
 flags.DEFINE_bool("do_predict", False ,"Whether to run prediction on the test set")
 
-flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
+flags.DEFINE_integer("train_batch_size", 64, "Total batch size for training.")
 
 flags.DEFINE_integer("eval_batch_size", 8, "Total batch size for eval.")
 
@@ -275,7 +275,6 @@ def main(_):
     "mrpc": classifier_data_lib.MrpcProcessor,
     "wnli": classifier_data_lib.WnliProcessor,
     "xnli": classifier_data_lib.XnliProcessor,
-    "inews": classifier_data_lib.InewsProcessor,
     }
   task_name = FLAGS.task_name.lower()
   if task_name not in processors:
@@ -426,7 +425,7 @@ def main(_):
         else:
             with strategy.scope():
                 model = get_model(
-                    albert_config=tinybert_config,
+                    albert_config=albert_config,
                     max_seq_length=FLAGS.max_seq_length,
                     num_labels=num_labels,
                     init_checkpoint=FLAGS.init_checkpoint,
