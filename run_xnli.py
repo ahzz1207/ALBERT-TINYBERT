@@ -125,7 +125,7 @@ flags.DEFINE_float("weight_decay", 0.01, "weight_decay")
 
 flags.DEFINE_float("adam_epsilon", 1e-6, "adam_epsilon")
 
-flags.DEFINE_integer("num_train_epochs", 3,
+flags.DEFINE_integer("num_train_epochs", 15,
                    "Total number of training epochs to perform.")
 
 flags.DEFINE_bool("enable_xla",False, "enables XLA")
@@ -137,7 +137,7 @@ flags.DEFINE_float(
 
 flags.DEFINE_enum("optimizer","AdamW",["LAMB","AdamW"],"Optimizer for training LAMB/AdamW")
 
-flags.DEFINE_bool("custom_training_loop",False,"Use Cutsom training loop instead of model.fit")
+flags.DEFINE_bool("custom_training_loop",True,"Use Cutsom training loop instead of model.fit")
 
 flags.DEFINE_integer("seed", 42, "random_seed")
 
@@ -360,7 +360,7 @@ def main(_):
         summary_dir = os.path.join(FLAGS.output_dir, 'summaries')
         summary_callback = tf.keras.callbacks.TensorBoard(summary_dir)
         checkpoint_path = os.path.join(FLAGS.output_dir, 'checkpoint')
-        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, save_weights_only=True)
+        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, save_weights_only=False)
         custom_callbacks = [summary_callback, checkpoint_callback]
 
         def metric_fn():
@@ -423,20 +423,19 @@ def main(_):
                     metric_fn = metric_fn,
                     custom_callbacks = custom_callbacks)
         else:
-            with strategy.scope():
-                model = get_model(
-                    albert_config=albert_config,
-                    max_seq_length=FLAGS.max_seq_length,
-                    num_labels=num_labels,
-                    init_checkpoint=FLAGS.init_checkpoint,
-                    learning_rate=FLAGS.learning_rate,
-                    num_train_steps=num_train_steps,
-                    num_warmup_steps=num_warmup_steps,
-                    loss_multiplier=loss_multiplier)
+            model = get_model(
+                albert_config=albert_config,
+                max_seq_length=FLAGS.max_seq_length,
+                num_labels=num_labels,
+                init_checkpoint=FLAGS.init_checkpoint,
+                learning_rate=FLAGS.learning_rate,
+                num_train_steps=num_train_steps,
+                num_warmup_steps=num_warmup_steps,
+                loss_multiplier=loss_multiplier)
             model.summary()
             training_dataset = train_input_fn()
             evaluation_dataset = eval_input_fn()
-            model.fit(x=training_dataset,validation_data=evaluation_dataset,epochs=FLAGS.num_train_epochs,callbacks=custom_callbacks)
+            model.fit(x=training_dataset,epochs=FLAGS.num_train_epochs,callbacks=custom_callbacks)
 
   if FLAGS.do_eval:
     if not model:

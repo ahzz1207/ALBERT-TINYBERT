@@ -241,6 +241,7 @@ class FullTokenizer(object):
   def __init__(self, vocab_file, do_lower_case=True, spm_model_file=None):
     self.vocab = None
     self.sp_model = None
+    spm_model_file = None
     if spm_model_file:
       self.sp_model = spm.SentencePieceProcessor()
       logging.info("loading sentence piece model")

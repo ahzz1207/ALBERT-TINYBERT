@@ -311,7 +311,7 @@ class InewsProcessor(DataProcessor):
       if set_type == "test":
         label = "0"
       else:
-        label = tokenization.preprocess_text(line[0])
+        label = tokenization.preprocess_text(line[1])
       labels.append(label)
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
