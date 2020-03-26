@@ -39,24 +39,24 @@ from tinybert import TinybertConfig, TinybertModel
 from input_pipeline import create_classifier_dataset
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
-os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+os.environ["CUDA_VISIBLE_DEVICES"] = '6,7'
 FLAGS = flags.FLAGS
 
 ## Required parameters
 flags.DEFINE_string(
-    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/train.tf_record',
+    "train_data_path", '/work/chineseGLUEdatasets.v0.0.1/tnews/train.tf_record',
     "train_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/dev.tf_record',
+    "eval_data_path", '/work/chineseGLUEdatasets.v0.0.1/tnews/dev.tf_record',
     "eval_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "predict_data_path", '/work/chineseGLUEdatasets.v0.0.1/inews/test.tsv',
+    "predict_data_path", '/work/chineseGLUEdatasets.v0.0.1/tnews/test.tsv',
     "predict_data path for tfrecords for the task.")
 
 flags.DEFINE_string(
-    "input_data_dir", '/work/chineseGLUEdatasets.v0.0.1/inews/',
+    "input_data_dir", '/work/chineseGLUEdatasets.v0.0.1/tnews/',
     "The input data dir. Should contain the .tsv files (or other data files) "
     "for the task.")
 
@@ -80,20 +80,20 @@ flags.DEFINE_string("spm_model_file", None,
                     "The model file for sentence piece tokenization.")
 
 flags.DEFINE_string(
-    "output_dir", './fine_tune_out/inews/tinybert',
+    "output_dir", './fine_tune_out/tnews/albert',
     "The output directory where the model checkpoints will be written.")
 
 flags.DEFINE_enum(
-    "strategy_type", "one", ["one", "mirror"],
+    "strategy_type", "mirror", ["one", "mirror"],
     "Training strategy for single or multi gpu training")
 
 ## Other parameters
 
 flags.DEFINE_string(
-    "init_checkpoint", '/work/ALBERT-TF2.0-master/fine_tune_out/inews/models/tinybert_model.h5',
+    "init_checkpoint", '/work/ALBERT-TF2.0-master/fine_tune_out/tnews/models/albert_model.h5',
     "Initial checkpoint (usually from a pre-trained ALBERT model).")
 
-flags.DEFINE_string("input_meta_data_path",'/work/chineseGLUEdatasets.v0.0.1/inews/input_mate_data.json',"input_meta_data_path")
+flags.DEFINE_string("input_meta_data_path",'/work/chineseGLUEdatasets.v0.0.1/tnews/input_mate_data.json',"input_meta_data_path")
 
 
 flags.DEFINE_bool(
@@ -109,7 +109,7 @@ flags.DEFINE_integer(
 
 flags.DEFINE_float("classifier_dropout",0.1,"classification layer dropout")
 
-flags.DEFINE_bool("do_train", True, "Whether to run training.")
+flags.DEFINE_bool("do_train", False, "Whether to run training.")
 
 flags.DEFINE_bool("do_eval", True, "Whether to run eval on the dev set.")
 
@@ -125,7 +125,7 @@ flags.DEFINE_float("weight_decay", 0.01, "weight_decay")
 
 flags.DEFINE_float("adam_epsilon", 1e-6, "adam_epsilon")
 
-flags.DEFINE_integer("num_train_epochs", 3,
+flags.DEFINE_integer("num_train_epochs", 2,
                    "Total number of training epochs to perform.")
 
 flags.DEFINE_bool("enable_xla",False, "enables XLA")
@@ -201,7 +201,7 @@ def get_model(albert_config, max_seq_length, num_labels, init_checkpoint, learni
     input_type_ids = tf.keras.layers.Input(
         shape=(max_seq_length,), dtype=tf.int32, name='input_type_ids')
 
-    albert_layer = AlbertModel(config=albert_config, float_type=float_type)
+    albert_layer = AlbertModel(config=albert_config, float_type=float_type, trainable=True)
 
     pooled_output, _, _, _ = albert_layer(input_word_ids, input_mask, input_type_ids)
 
@@ -361,7 +361,7 @@ def main(_):
         summary_dir = os.path.join(FLAGS.output_dir, 'summaries')
         summary_callback = tf.keras.callbacks.TensorBoard(summary_dir)
         checkpoint_path = os.path.join(FLAGS.output_dir, 'checkpoint')
-        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, save_weights_only=True)
+        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, save_weights_only=False)
         custom_callbacks = [summary_callback, checkpoint_callback]
 
         def metric_fn():
@@ -424,16 +424,15 @@ def main(_):
                     metric_fn = metric_fn,
                     custom_callbacks = custom_callbacks)
         else:
-            with strategy.scope():
-                model = get_model(
-                    albert_config=tinybert_config,
-                    max_seq_length=FLAGS.max_seq_length,
-                    num_labels=num_labels,
-                    init_checkpoint=FLAGS.init_checkpoint,
-                    learning_rate=FLAGS.learning_rate,
-                    num_train_steps=num_train_steps,
-                    num_warmup_steps=num_warmup_steps,
-                    loss_multiplier=loss_multiplier)
+            model = get_model(
+                albert_config=albert_config,
+                max_seq_length=FLAGS.max_seq_length,
+                num_labels=num_labels,
+                init_checkpoint=FLAGS.init_checkpoint,
+                learning_rate=FLAGS.learning_rate,
+                num_train_steps=num_train_steps,
+                num_warmup_steps=num_warmup_steps,
+                loss_multiplier=loss_multiplier)
             model.summary()
             training_dataset = train_input_fn()
             evaluation_dataset = eval_input_fn()

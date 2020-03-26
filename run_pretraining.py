@@ -40,19 +40,19 @@ FLAGS = flags.FLAGS
 
 ## Required parameters
 flags.DEFINE_string(
-    "albert_config_file", "/work/ALBERT-TF2.0-master/model_configs/base/config.json",
+    "albert_config_file", "/work/ALBERT-TF2.0-master/model_configs/xxlarge/config.json",
     "The config json file corresponding to the pre-trained ALBERT model. "
     "This specifies the model architecture.")
 
 flags.DEFINE_bool(
-    "finetune_tinybert", True, "decided witch loss will u choose to train"
+    "finetune_tinybert", True, "decided which loss will u choose to train"
 )
 
 flags.DEFINE_bool(
     "start_with_train_model", False, "model restore from ckpt of trained_model ,else restore from every .h5 file")
 
 flags.DEFINE_string(
-    "tinybert_config_file", "/work/ALBERT-TF2.0-master/model_configs/base/config_tiny.json",
+    "tinybert_config_file", "/work/ALBERT-TF2.0-master/model_configs/xxlarge/config_tiny.json",
     "The config json file corresponding to the pre-trained TINYBERT model. "
     "This specifies the model architecture.")
 
@@ -64,7 +64,7 @@ flags.DEFINE_string("meta_data_file_path", None,
                     "The path in which input meta data will be written.")
 
 flags.DEFINE_string(
-    "output_dir", "/work/ALBERT-TF2.0-master/model_out4/",
+    "output_dir", "/work/ALBERT-TF2.0-master/model_out5/",
     "The output directory where the model checkpoints will be written.")
 
 ## Other parameters
@@ -235,8 +235,7 @@ def run_customized_training(strategy,
         train_input_fn=train_input_fn,
         steps_per_epoch=steps_per_epoch,
         steps_per_loop=steps_per_loop,
-        epochs=epochs,
-        use_mlm_loss=use_mlm_loss)
+        epochs=epochs,)
   # Creates the BERT core model outside distribution strategy scope.
   training, albert, tinybert = tinybert_model.train_tinybert_model(
                                           tinybert_config, albert_config, 

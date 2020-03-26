@@ -231,10 +231,8 @@ def run_customized_training_loop(
         model_outputs = model(inputs, training=True)
         print(model_outputs)
         # loss = loss_fn(labels, model_outputs)
-        if not use_mlm_loss:
-          loss = model_outputs
-        else:
-          loss = model_outputs[-1]
+        
+        loss = model_outputs[0]
       # Collects training variables.      
       training_vars = models[-1].trainable_variables
       # 去除albert的变量

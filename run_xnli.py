@@ -39,7 +39,7 @@ from tinybert import TinybertConfig, TinybertModel
 from input_pipeline import create_classifier_dataset
 from model_training_utils import run_customized_training_loop
 from optimization import LAMB, AdamWeightDecay, WarmUp
-os.environ["CUDA_VISIBLE_DEVICES"] = '2,3,4,5'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '2,3,4,5'
 FLAGS = flags.FLAGS
 
 ## Required parameters
@@ -80,7 +80,7 @@ flags.DEFINE_string("spm_model_file", None,
                     "The model file for sentence piece tokenization.")
 
 flags.DEFINE_string(
-    "output_dir", './fine_tune_out/xnli/',
+    "output_dir", '/work/ALBERT-TF2.0-master/fine_tune_out/xnli/',
     "The output directory where the model checkpoints will be written.")
 
 flags.DEFINE_enum(

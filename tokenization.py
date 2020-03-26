@@ -27,7 +27,6 @@ import unicodedata
 import six
 from six.moves import range
 import tensorflow as tf
-import sentencepiece as spm
 
 from absl import logging
 

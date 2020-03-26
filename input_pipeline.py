@@ -135,7 +135,6 @@ def create_pretrain_dataset(input_patterns,
 
   dataset = dataset.batch(batch_size, drop_remainder=True)
   dataset = dataset.prefetch(1024)
-  print("dataset length :", len(dataset))
   return dataset
 
 
